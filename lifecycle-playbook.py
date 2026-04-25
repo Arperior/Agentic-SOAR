@@ -1,43 +1,8 @@
 import pandas as pd
 import numpy as np
-import rrcf
-import tqdm
-from catboost import CatBoostClassifier
 
 # ==========================================
-# PART 1: ANOMALY DETECTION ENGINE (RCF)
-# ==========================================
-class RCF:
-    def __init__(self, num_trees=40, tree_size=256, seed=0, warmup=500, smoothing_window=20):
-        self.num_trees = num_trees
-        self.tree_size = tree_size
-        self.rng = np.random.default_rng(seed)
-        self.forest = [rrcf.RCTree() for _ in range(num_trees)]
-        self.index = 0
-        self.warmup = warmup
-        self.smoothing_window = smoothing_window
-        self.history = []
-
-    def score(self, x):
-        scores = []
-        for tree in self.forest:
-            if len(tree.leaves) >= self.tree_size:
-                drop_index = self.rng.choice(list(tree.leaves.keys()))
-                tree.forget_point(drop_index)
-            tree.insert_point(x, index=self.index)
-            scores.append(tree.codisp(self.index))
-        
-        self.index += 1
-        raw_score = float(np.mean(scores))
-        normalized = 1.0 / (1.0 + np.exp(-np.log1p(raw_score)))
-        
-        self.history.append(normalized)
-        if len(self.history) > self.smoothing_window:
-            self.history.pop(0)
-        return float(np.mean(self.history))
-
-# ==========================================
-# PART 2: THE AGENTIC PLAYBOOK LOGIC
+# THE AGENTIC PLAYBOOK LOGIC
 # ==========================================
 class AgenticSOARPlaybook:
     def __init__(self, cat_model, incident_model, rcf_model, fusion_weight=0.6, threshold=0.7):
@@ -120,39 +85,3 @@ class AgenticSOARPlaybook:
                 reasons.append("Tunnel instability/Packet loss detected.")
 
         return f"Forensic analysis for {threat}: " + (" ".join(reasons) if reasons else "General statistical anomaly.")
-
-# ==========================================
-# PART 3: BOOTSTRAP & RUN
-# ==========================================
-def run_agentic_system(train_path):
-    print("Initializing Agentic System...")
-    
-    # Preprocessing (Simplified from your utils.py)
-    df = pd.read_csv(train_path)
-    X = df.drop(['label', 'attack_cat', 'id'], axis=1, errors='ignore')
-    y_binary = df['label']
-    y_multi = df['attack_cat'].fillna('Normal')
-    
-    # Identify Cat Features
-    cat_features = X.select_dtypes(include=['object']).columns.tolist()
-    X[cat_features] = X[cat_features].fillna('unknown').astype(str)
-    
-    # 1. Train Models
-    print("Training Decision Engines...")
-    bin_model = CatBoostClassifier(iterations=50, cat_features=cat_features, verbose=0).fit(X, y_binary)
-    inc_model = CatBoostClassifier(iterations=50, cat_features=cat_features, verbose=0).fit(X, y_multi)
-    
-    # 2. Setup Playbook
-    my_rcf = RCF()
-    playbook = AgenticSOARPlaybook(bin_model, inc_model, my_rcf)
-    
-    # 3. Process Sample Row
-    sample_row = X.iloc[0:1] # Test with one row
-    result = playbook.execute_investigation(sample_row)
-    
-    print("\n--- AGENT OUTPUT ---")
-    import json
-    print(json.dumps(result, indent=4))
-
-# To run:
-# run_agentic_system('unsw_train.csv')
