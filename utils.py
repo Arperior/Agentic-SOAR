@@ -17,13 +17,29 @@ def train_categorical_model(X_cat, y, cat_cols):
     cb_model.fit(X_cat, y)
     return cb_model
 
+def train_incident_agent(X_cat, y_multi, cat_cols):
+    print("\nTraining Incident Agent (Multi-class Threat Classifier)...")
+    incident_model = CatBoostClassifier(
+        iterations=100,
+        learning_rate=0.1,
+        depth=6,
+        loss_function='MultiClass', 
+        cat_features=cat_cols,
+        l2_leaf_reg=15,                 
+        auto_class_weights='Balanced',  # prevents rare attacks from being ignored
+        verbose=False 
+    )
+    incident_model.fit(X_cat, y_multi)
+    return incident_model
+
 def prepare_datasets(file_path):
     print(f"Loading and transforming data from {file_path}...")
     df = pd.read_csv(file_path)
 
     if 'id' in df.columns:
         df = df.drop('id', axis=1)
-    
+
+    labels_multiclass = df['attack_cat'].fillna('Normal')
     labels_binary = df['label']
     X_raw = df.drop(['label', 'attack_cat'], axis=1, errors='ignore')
 
@@ -50,7 +66,7 @@ def prepare_datasets(file_path):
     print(f"Final Categorical features: {len(categorical_cols)}")
     print(f"Numerical features compressed from {len(numerical_cols)} down to {X_train_num.shape[1]} Principal Components")
     
-    return X_train_cat, X_train_num, labels_binary, categorical_cols
+    return X_train_cat, X_train_num, labels_binary, categorical_cols, labels_multiclass
 
 def validate_results(y_true, final_risk, catboost_model, categorical_cols,optimal_threshold):
     print("\n--- PIPELINE VALIDATION ---")
