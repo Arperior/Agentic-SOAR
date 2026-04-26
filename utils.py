@@ -36,32 +36,54 @@ def train_incident_agent(X_cat, y_multi, cat_cols):
     incident_model.fit(X_cat, y_multi)
     return incident_model
 
-def generate_oof_features(X_cat, X_num, y, cat_cols, train_cat_func, rcf_class, n_splits=5):
+def generate_oof_features(X_cat, X_num, y, cat_cols, train_cat_func, rcf_class, train_incident_func, n_splits=5, y_multi=None):
     """
     Generates clean, Out-of-Fold predictions to train the Meta-Learner without leakage.
+
+    FIX (Issue 3): Also generates OOF incident-agent entropy so the meta-learner
+    trains on the same 3-feature distribution it receives at test time.
+
+    FIX (Issue 5): All three OOF arrays are guaranteed to have the same length
+    as `y`, so np.column_stack in the caller will always produce a valid (N, 3)
+    matrix — a shape mismatch here would previously surface only at runtime as a
+    cryptic broadcast error.
+
+    Parameters
+    ----------
+    y_multi : pd.Series, required when train_incident_func is provided.
+        The multiclass attack-category labels aligned with y. Must be passed in
+        so the incident agent folds are sliced correctly — using y_tr (binary)
+        here would cause CatBoostClassifier to train with loss_function='MultiClass'
+        on binary labels, which raises a silent accuracy collapse or a hard error.
     """
+    if train_incident_func is not None and y_multi is None:
+        raise ValueError(
+            "y_multi must be provided when train_incident_func is given. "
+            "Pass the multiclass label Series from prepare_datasets()."
+        )
+
     print(f"\nGenerating {n_splits}-Fold OOF Predictions for Meta-Learner training...")
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=42)
 
     oof_cat = np.zeros(len(y))
     oof_rcf = np.zeros(len(y))
+    oof_incident_entropy = np.zeros(len(y))
 
     # Reset indices to ensure smooth alignment during slicing
     X_cat_reset = X_cat.reset_index(drop=True)
     X_num_reset = X_num.reset_index(drop=True)
     y_reset = y.reset_index(drop=True)
+    y_multi_reset = y_multi.reset_index(drop=True) if y_multi is not None else None
 
     fold = 1
     for train_idx, val_idx in skf.split(X_cat_reset, y_reset):
         print(f"  -> Processing Fold {fold}/{n_splits}...")
         
-        # Split data for this fold
         X_cat_tr, X_cat_val = X_cat_reset.iloc[train_idx], X_cat_reset.iloc[val_idx]
         X_num_tr, X_num_val = X_num_reset.iloc[train_idx], X_num_reset.iloc[val_idx]
         y_tr = y_reset.iloc[train_idx]
 
         # 1. Train temporary CatBoost and predict on hold-out fold
-        # (Pass verbose=False to your training function if possible to reduce log spam)
         temp_cat = train_cat_func(X_cat_tr, y_tr, cat_cols)
         oof_cat[val_idx] = temp_cat.predict_proba(X_cat_val)[:, 1]
 
@@ -71,10 +93,21 @@ def generate_oof_features(X_cat, X_num, y, cat_cols, train_cat_func, rcf_class, 
         temp_rcf.fit_predict(X_num_tr_normal) 
         oof_rcf[val_idx] = temp_rcf.predict_proba(X_num_val)
 
+        # 3. FIX (Issue 3): Train temporary incident agent on the MULTICLASS labels
+        # (y_multi_tr), not the binary y_tr — passing binary labels to a MultiClass
+        # CatBoost model either silently collapses to a 2-class problem or raises
+        # a dimension error depending on the CatBoost version.
+        if train_incident_func is not None:
+            y_multi_tr = y_multi_reset.iloc[train_idx]
+            temp_incident = train_incident_func(X_cat_tr, y_multi_tr, cat_cols)
+            incident_proba_val = temp_incident.predict_proba(X_cat_val)
+            p = np.clip(incident_proba_val, 1e-12, 1.0)
+            oof_incident_entropy[val_idx] = -np.sum(p * np.log(p), axis=1)
+
         fold += 1
         
     print("OOF Generation Complete.")
-    return oof_cat, oof_rcf
+    return oof_cat, oof_rcf, oof_incident_entropy
 
 def prepare_datasets(file_path, is_train=False):
     """

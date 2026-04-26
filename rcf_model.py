@@ -3,6 +3,7 @@ import numpy as np
 import tqdm
 import dill as pickle
 import os
+from collections import deque
 
 class RCF:
     """
@@ -18,7 +19,9 @@ class RCF:
         self.index = 0
         self.warmup = warmup
         self.smoothing_window = smoothing_window
-        self.history = []
+        # FIX (Issue 2): Use a fixed-length deque so a sustained burst of anomalies
+        # cannot erode detection sensitivity by growing the history buffer unboundedly.
+        self.history = deque(maxlen=smoothing_window)
         self._is_fitted = False
 
     def _insert_point_and_score(self, x):
@@ -50,15 +53,29 @@ class RCF:
         return 1.0 / (1.0 + np.exp(-np.log1p(raw_score)))
 
     def _smooth_score(self, score):
+        # FIX (Issue 2): deque(maxlen=N) automatically evicts oldest entry —
+        # no manual pop needed, and the window is strictly bounded.
         self.history.append(score)
-        if len(self.history) > self.smoothing_window:
-            self.history.pop(0)
         return float(np.mean(self.history))
 
     # --- CORE API METHODS ---
 
     def fit_predict(self, X):
-        """Phase 1 (Training): Builds baseline forest and returns scores."""
+        """
+        Phase 1 (Training): Builds the baseline forest from normal traffic.
+
+        FIX (Issue 1 — Score Distribution Mismatch):
+        Returns raw, unsmoothed scores so OOF features fed to the meta-learner
+        are generated under IDENTICAL conditions to predict_proba() at inference
+        time. Previously, fit_predict used smoothing and warmup suppression while
+        predict_proba used smooth=False, causing the meta-learner to be trained on
+        a different score distribution than it receives during evaluation.
+
+        Warmup suppression (returning 0.0 for the first N points) is also removed:
+        injecting artificial zeros into OOF features would skew the meta-learner's
+        weight calibration. The forest's early scores are naturally low-confidence
+        but are real values the meta-learner can learn from.
+        """
         print(f"Building RRCF Forest ({self.num_trees} trees)...")
         scores = []
         X_array = np.asarray(X)
@@ -67,11 +84,7 @@ class RCF:
             self.index += 1
             raw_score = self._insert_point_and_score(x)
             norm_score = self._normalize_score(raw_score)
-
-            if self.index < self.warmup:
-                scores.append(0.0)
-            else:
-                scores.append(self._smooth_score(norm_score))
+            scores.append(norm_score)  # Always append the real score
                 
         self._is_fitted = True
         return np.array(scores)
@@ -79,12 +92,12 @@ class RCF:
     def predict_proba(self, X, smooth=False):
         """
         Phase 4 (Batch Testing): Scores unseen data blindly.
-        smooth=False guarantees order-independent, i.i.d evaluation.
+        smooth=False guarantees order-independent, i.i.d evaluation and matches
+        the distribution used during OOF generation in fit_predict().
         """
         if not self._is_fitted:
             raise RuntimeError("[ERROR] RCF Model must be fitted before predicting.")
             
-        self.history = [] 
         scores = []
         X_array = np.asarray(X)
         
@@ -92,7 +105,6 @@ class RCF:
             raw_score = self._score_blind(x)
             norm_score = self._normalize_score(raw_score)
             
-            # Apply your context-aware smoothing logic
             if smooth:
                 scores.append(self._smooth_score(norm_score))
             else:
@@ -120,7 +132,7 @@ class RCF:
         print("Resetting RCF Model to initial state...")
         self.forest = [rrcf.RCTree() for _ in range(self.num_trees)]
         self.index = 0
-        self.history = []
+        self.history = deque(maxlen=self.smoothing_window)
         self._is_fitted = False
 
     # --- PERSISTENCE METHODS ---
@@ -128,7 +140,6 @@ class RCF:
         if not self._is_fitted:
             raise RuntimeError("Cannot save an unfitted model.")
             
-        # Ensure the directory exists
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
             
         state = {
@@ -137,10 +148,15 @@ class RCF:
             'warmup': self.warmup,
             'smoothing_window': self.smoothing_window,
             'forest': self.forest,
-            'index': self.index
+            'index': self.index,
+            # FIX (Issue 4): Persist history so the loaded model resumes with a
+            # warm smoothing context rather than a cold-start deque. Without this,
+            # the first `smoothing_window` live predictions after loading have a
+            # systematic cold-start bias toward lower (less anomalous) scores.
+            'history': list(self.history),
         }
         with open(filepath, 'wb') as f:
-            pickle.dump(state, f)  # Using dill's dump
+            pickle.dump(state, f)
         print(f"RCF state successfully saved to {filepath}")
 
     @classmethod
@@ -159,6 +175,10 @@ class RCF:
         )
         instance.forest = state['forest']
         instance.index = state['index']
+        # FIX (Issue 4): Restore history as a bounded deque, not a plain list,
+        # so the smoothing window behaves identically to the trained instance.
+        # .get() with a fallback handles pkl files saved before this fix.
+        instance.history = deque(state.get('history', []), maxlen=state['smoothing_window'])
         instance._is_fitted = True
         
         print(f"RCF state successfully loaded from {filepath}")

@@ -8,6 +8,17 @@ class CostSensitiveMetaLearner:
     Production-Grade Logistic Regression Meta-Learner.
     Features: L2 Regularization, Persistent Internal Scaler, Early Stopping,
               Input Validation, and Disk Persistence.
+
+    FIX (Issue 3): Now accepts 3 meta-features:
+      [0] CatBoost binary probability
+      [1] RCF anomaly score
+      [2] Incident agent uncertainty (entropy over attack-class softmax)
+    The incident agent's per-class confidence distribution carries signal about
+    rare attack types that the binary CatBoost score alone underweights. Rather
+    than feeding all N class probabilities (which would overfit on a 2-weight
+    logistic model), we reduce to a single entropy scalar: high entropy = the
+    incident agent is uncertain = borderline traffic the meta-learner should
+    scrutinise more carefully.
     """
     def __init__(self, learning_rate=0.1, epochs=5000, cost_fn=10, cost_fp=2, lambda_reg=0.1, epsilon=1e-5):
         self.lr = learning_rate
@@ -20,7 +31,6 @@ class CostSensitiveMetaLearner:
         self.weights = None
         self.bias = None
         
-        # ISSUE 5 FIX: Use a persistent scaler object to prevent Normalization Leakage
         self.scaler = StandardScaler()
         self._is_fitted = False
 
@@ -30,8 +40,11 @@ class CostSensitiveMetaLearner:
 
     def _validate_input(self, X):
         """Ensures the input matrix perfectly matches the pipeline expectations."""
-        if X.shape[1] != 2:
-            raise ValueError(f"[ERROR] Meta-Learner expects exactly 2 features (CatBoost, RCF). Received: {X.shape[1]}")
+        if X.shape[1] != 3:
+            raise ValueError(
+                f"[ERROR] Meta-Learner expects exactly 3 features "
+                f"(CatBoost prob, RCF score, Incident entropy). Received: {X.shape[1]}"
+            )
 
     def fit(self, X, y):
         self._validate_input(X)
@@ -121,6 +134,26 @@ class CostSensitiveMetaLearner:
         
         print(f"Model state successfully loaded from {filepath}")
         return instance
+
+
+def _incident_entropy(incident_proba: np.ndarray) -> np.ndarray:
+    """
+    FIX (Issue 3): Reduces the incident agent's N-class softmax output to a
+    single scalar per sample using Shannon entropy.
+
+    High entropy  → the agent is uncertain across attack categories → the
+                    meta-learner should treat this as an elevated risk signal.
+    Low entropy   → the agent is confident about one category (or Normal) →
+                    pass-through to binary decision.
+
+    Using entropy as the reduction keeps the meta-learner's input dimensionality
+    fixed regardless of how many attack classes exist in the dataset, and avoids
+    overfitting that would result from feeding all N class probabilities into a
+    2-weight logistic model.
+    """
+    # Clip to avoid log(0); incident_proba rows should already sum to 1.0
+    p = np.clip(incident_proba, 1e-12, 1.0)
+    return -np.sum(p * np.log(p), axis=1)
 
 
 def train_fusion_meta_learner(X_train_meta, y_train, COST_FN=10, COST_FP=2, lambda_reg=0.1):
