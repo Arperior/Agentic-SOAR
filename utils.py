@@ -280,10 +280,10 @@ def find_optimal_threshold(
     # Persist so the SOAR agent can load it without re-running training
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
     record = {
-        "optimal_threshold": best_threshold,
-        "soc_cost":          best_cost,
-        "cost_fn":           cost_fn,
-        "cost_fp":           cost_fp,
+        "optimal_threshold": float(best_threshold),
+        "soc_cost":          int(best_cost),
+        "cost_fn":           int(cost_fn),
+        "cost_fp":           int(cost_fp),
         "confusion": {
             "tn": int(best_tn), "fp": int(best_fp),
             "fn": int(best_fn), "tp": int(best_tp)

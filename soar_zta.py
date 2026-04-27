@@ -58,8 +58,25 @@ import datetime
 import requests
 import re
 import os
+import numpy as np
 
 from policy_agent import PolicyAgent, TrustEvaluation
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    """
+    Fallback JSON encoder that handles numpy scalars and arrays.
+    Used in evaluate_incident so json.dumps(context) never raises
+    TypeError regardless of what telemetry fields contain.
+    """
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 
 class ZeroTrustSOARAgent:
@@ -305,17 +322,38 @@ class ZeroTrustSOARAgent:
     # Context construction
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _sanitize_for_json(obj):
+        """
+        Recursively converts numpy scalars and arrays to native Python types
+        so the context dict is always safe to pass to json.dumps / the LLM.
+        Called once in construct_context so every downstream code path
+        (PolicyAgent, evaluate_incident, _save_memory) gets clean types.
+        """
+        if isinstance(obj, dict):
+            return {k: ZeroTrustSOARAgent._sanitize_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [ZeroTrustSOARAgent._sanitize_for_json(v) for v in obj]
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return obj
+
     def construct_context(self, event_id, cat_risk, rcf_risk, final_risk, threat_type, telemetry):
+        raw_telemetry = telemetry.to_dict() if hasattr(telemetry, "to_dict") else dict(telemetry)
         return {
-            "event_id": event_id,
+            "event_id": int(event_id) if hasattr(event_id, 'item') else event_id,
             "timestamp": datetime.datetime.now().isoformat(),
             "ml_risk_profile": {
-                "categorical_risk": round(cat_risk, 3),
-                "anomaly_risk": round(rcf_risk, 3),
-                "fused_risk": round(final_risk, 3)
+                "categorical_risk": round(float(cat_risk), 3),
+                "anomaly_risk":     round(float(rcf_risk), 3),
+                "fused_risk":       round(float(final_risk), 3)
             },
-            "predicted_threat_classification": threat_type,
-            "network_telemetry": telemetry.to_dict() if hasattr(telemetry, "to_dict") else dict(telemetry)
+            "predicted_threat_classification": str(threat_type),
+            "network_telemetry": self._sanitize_for_json(raw_telemetry)
         }
 
     # ------------------------------------------------------------------
@@ -361,7 +399,7 @@ class ZeroTrustSOARAgent:
 
         user_prompt = (
             f"Evaluate this context strictly according to the rules and output ONLY JSON:\n"
-            f"{json.dumps(context, indent=2)}"
+            f"{json.dumps(context, indent=2, cls=_NumpyEncoder)}"
         )
 
         url = "http://localhost:11434/api/generate"

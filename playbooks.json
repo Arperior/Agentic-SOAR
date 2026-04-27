@@ -1,0 +1,93 @@
+{
+    "ALLOW": {
+        "description": "Standard benign traffic or AI-verified False Positive.",
+        "steps": [
+            {
+                "tool": "Splunk_SIEM",
+                "action": "ingest_telemetry",
+                "index": "network_traffic_allowed"
+            },
+            {
+                "tool": "Metrics_Dashboard",
+                "action": "increment_fp_counter",
+                "status": "success"
+            }
+        ]
+    },
+    "LOG_ONLY": {
+        "description": "RCF score below threshold. Event logged, no action taken.",
+        "steps": [
+            {
+                "tool": "Splunk_SIEM",
+                "action": "ingest_telemetry",
+                "index": "network_traffic_benign"
+            }
+        ]
+    },
+    "STEP_UP_AUTH": {
+        "description": "Ambiguous behaviour. Enforce Zero Trust Identity Verification.",
+        "steps": [
+            {
+                "tool": "Okta_IAM",
+                "action": "trigger_push_mfa",
+                "timeout": 60
+            },
+            {
+                "tool": "Splunk_SIEM",
+                "action": "create_notable_event",
+                "severity": "Medium"
+            },
+            {
+                "tool": "Jira_ServiceDesk",
+                "action": "open_ticket",
+                "assignee": "Tier_1_SOC"
+            }
+        ]
+    },
+    "NETWORK_ISOLATION": {
+        "description": "Confirmed malicious signature or critical risk. Immediate host containment.",
+        "steps": [
+            {
+                "tool": "VirusTotal_API",
+                "action": "query_ip_reputation"
+            },
+            {
+                "tool": "Palo_Alto_Firewall",
+                "action": "block_src_ip",
+                "duration": "permanent"
+            },
+            {
+                "tool": "CrowdStrike_EDR",
+                "action": "isolate_host_network"
+            },
+            {
+                "tool": "Active_Directory",
+                "action": "revoke_session_tokens"
+            },
+            {
+                "tool": "PagerDuty",
+                "action": "page_on_call_engineer",
+                "priority": "CRITICAL"
+            }
+        ]
+    },
+    "RATE_LIMIT_DOS": {
+        "description": "Volumetric anomaly detected (DoS). Throttle traffic.",
+        "steps": [
+            {
+                "tool": "Cloudflare_WAF",
+                "action": "enable_under_attack_mode"
+            },
+            {
+                "tool": "F5_Load_Balancer",
+                "action": "throttle_source_ip",
+                "limit": "100_req_per_min"
+            },
+            {
+                "tool": "Splunk_SIEM",
+                "action": "create_notable_event",
+                "severity": "High"
+            }
+        ]
+    }
+}

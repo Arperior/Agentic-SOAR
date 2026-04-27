@@ -1,0 +1,48 @@
+{
+    "_comment": "Edit this file to reflect your organisation's Zero Trust policy.",
+    "ml_risk_weight": 0.5,
+    "threat_class_penalties": {
+        "Normal": 0.0,
+        "Generic": 0.2,
+        "Exploits": 0.3,
+        "Fuzzers": 0.2,
+        "DoS": 0.15,
+        "Reconnaissance": 0.25,
+        "Backdoor": 0.4,
+        "Analysis": 0.15,
+        "Shellcode": 0.45,
+        "Worms": 0.4,
+        "UNKNOWN": 0.3
+    },
+    "quarantine_penalty": 0.4,
+    "allowlist_bonus": 0.15,
+    "approved_proto_service_combos": [
+        "tcp_http",
+        "tcp_https",
+        "tcp_ftp",
+        "udp_dns",
+        "tcp_smtp",
+        "tcp_ssh",
+        "tcp_rdp",
+        "udp_ntp"
+    ],
+    "unapproved_combo_penalty": 0.1,
+    "asset_sensitivity_tiers": {
+        "10.0.0.": 1.5,
+        "10.1.": 1.2,
+        "192.168.": 1.0,
+        "172.16.": 1.1,
+        "DEFAULT": 1.0
+    },
+    "business_hours": {
+        "start": 8,
+        "end": 20
+    },
+    "after_hours_penalty": 0.1,
+    "high_volume_threshold": 5000,
+    "high_volume_penalty": 0.1,
+    "high_categorical_risk_threshold": 0.7,
+    "high_categorical_risk_penalty": 0.1,
+    "score_floor": 0.0,
+    "score_ceiling": 1.0
+}
