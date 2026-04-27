@@ -1,12 +1,13 @@
 import numpy as np
 import pandas as pd
+import json
+import os
 from catboost import CatBoostClassifier
 from sklearn.metrics import confusion_matrix, classification_report
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedKFold
 import joblib
-import os
 
 
 def train_categorical_model(X_cat, y, cat_cols):
@@ -224,10 +225,82 @@ def prepare_datasets(file_path, is_train=False):
     return X_cat, X_num, X_num_raw, labels_binary, categorical_cols, labels_multiclass
 
 
-def validate_results(y_true, final_risk, catboost_model, categorical_cols):
+def find_optimal_threshold(
+    y_true,
+    risk_scores,
+    cost_fn: int = 10,
+    cost_fp: int = 2,
+    n_thresholds: int = 1000,
+    save_path: str = "Saves/optimal_threshold.json"
+) -> float:
+    """
+    Sweeps decision thresholds and returns the one that minimises the
+    asymmetric SOC cost function:  cost = (FN × cost_fn) + (FP × cost_fp).
+
+    This must be called on OOF risk scores — never on the held-out test set —
+    so the threshold is chosen without any information from test data.
+
+    Parameters
+    ----------
+    y_true       : array-like of int  — ground-truth binary labels (0/1)
+    risk_scores  : array-like of float — meta-learner output probabilities
+    cost_fn      : int   — penalty per missed attack (False Negative)
+    cost_fp      : int   — penalty per false alarm   (False Positive)
+    n_thresholds : int   — number of candidate thresholds to evaluate
+    save_path    : str   — where to persist the result (loaded by SOAR agent)
+
+    Returns
+    -------
+    float — the threshold value in [0, 1] that minimises total SOC cost
+    """
+    y_true = np.asarray(y_true)
+    risk_scores = np.asarray(risk_scores)
+
+    thresholds = np.linspace(0.01, 0.99, n_thresholds)
+    best_threshold = 0.5
+    best_cost = np.inf
+    best_tn = best_fp = best_fn = best_tp = 0
+
+    for t in thresholds:
+        preds = (risk_scores >= t).astype(int)
+        tn, fp, fn, tp = confusion_matrix(y_true, preds).ravel()
+        cost = (fn * cost_fn) + (fp * cost_fp)
+        if cost < best_cost:
+            best_cost = cost
+            best_threshold = float(t)
+            best_tn, best_fp, best_fn, best_tp = tn, fp, fn, tp
+
+    print("\n--- THRESHOLD OPTIMISATION (OOF) ---")
+    print(f"Sweep range : 0.01 – 0.99 ({n_thresholds} candidates)")
+    print(f"Cost function: (FN × {cost_fn}) + (FP × {cost_fp})")
+    print(f"Optimal threshold : {best_threshold:.4f}")
+    print(f"Minimum SOC cost  : {best_cost}")
+    print(f"  TN={best_tn}  FP={best_fp}  FN={best_fn}  TP={best_tp}")
+
+    # Persist so the SOAR agent can load it without re-running training
+    os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+    record = {
+        "optimal_threshold": best_threshold,
+        "soc_cost":          best_cost,
+        "cost_fn":           cost_fn,
+        "cost_fp":           cost_fp,
+        "confusion": {
+            "tn": int(best_tn), "fp": int(best_fp),
+            "fn": int(best_fn), "tp": int(best_tp)
+        }
+    }
+    with open(save_path, "w") as f:
+        json.dump(record, f, indent=4)
+    print(f"Threshold saved to {save_path}")
+
+    return best_threshold
+
+
+def validate_results(y_true, final_risk, catboost_model, categorical_cols,
+                     optimal_threshold: float = 0.5):
     print("\n--- PIPELINE VALIDATION ---")
 
-    predictions = (final_risk > 0.5).astype(int)
+    predictions = (final_risk > optimal_threshold).astype(int)
 
     print("\n1. Classification Report (Operational Impact):")
     print(classification_report(y_true, predictions, target_names=['Normal (0)', 'Attack (1)']))

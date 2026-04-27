@@ -94,8 +94,9 @@ _DEFAULT_POLICY_CONFIG = {
     "unapproved_combo_penalty": 0.10,
 
     # --- Asset sensitivity tiers ---
-    # Map dst_ip prefixes (CIDR-like prefix match) to a sensitivity multiplier.
-    # Higher multiplier = more aggressive penalisation for the same risk score.
+    # Map dst_ip prefixes to a sensitivity multiplier applied ONLY to the
+    # ML risk penalty — not to the full accumulated deficit.
+    # Higher multiplier = harder penalisation of the raw ML risk signal.
     "asset_sensitivity_tiers": {
         "10.0.0.":   1.5,    # critical infrastructure
         "10.1.":     1.2,    # internal servers
@@ -153,7 +154,7 @@ class PolicyAgent:
 
     def _load_config(self) -> dict:
         if not os.path.exists(self.policy_config_file):
-            print(f"⚙️  [PolicyAgent] Creating default policy config: {self.policy_config_file}")
+            print(f"[PolicyAgent] Creating default policy config: {self.policy_config_file}")
             with open(self.policy_config_file, "w") as f:
                 json.dump(_DEFAULT_POLICY_CONFIG, f, indent=4)
             return dict(_DEFAULT_POLICY_CONFIG)
@@ -204,8 +205,10 @@ class PolicyAgent:
         factors: list[TrustFactor] = []
         violations: list[str] = []
 
-        # 1. ML fused risk — primary signal
-        score, factors = self._apply_ml_risk(score, factors, ml_profile)
+        # 1. ML fused risk — primary signal, with asset sensitivity multiplier
+        #    applied HERE so it amplifies only the ML risk penalty, not the
+        #    full accumulated deficit (FIX: previously amplified everything).
+        score, factors = self._apply_ml_risk(score, factors, ml_profile, telemetry)
 
         # 2. Threat classification
         score, factors, violations = self._apply_threat_class(
@@ -222,20 +225,17 @@ class PolicyAgent:
             score, factors, violations, telemetry
         )
 
-        # 5. Asset sensitivity multiplier
-        score, factors = self._apply_asset_sensitivity(score, factors, telemetry)
-
-        # 6. Time-of-day policy
+        # 5. Time-of-day policy
         score, factors, violations = self._apply_time_policy(
             score, factors, violations
         )
 
-        # 7. Volume / rate anomaly
+        # 6. Volume / rate anomaly
         score, factors, violations = self._apply_volume_policy(
             score, factors, violations, telemetry
         )
 
-        # 8. Categorical risk spike
+        # 7. Categorical risk spike
         score, factors = self._apply_categorical_risk(score, factors, ml_profile)
 
         # Clamp to [floor, ceiling]
@@ -272,16 +272,48 @@ class PolicyAgent:
     # ------------------------------------------------------------------
 
     def _apply_ml_risk(
-        self, score: float, factors: list, ml_profile: dict
+        self, score: float, factors: list, ml_profile: dict, telemetry: dict
     ) -> tuple:
+        """
+        Applies the fused ML risk penalty, scaled by the asset sensitivity
+        multiplier for the destination IP.
+
+        FIX: The multiplier now applies ONLY to the ML risk penalty, not to
+        the full accumulated trust deficit. This prevents non-linear collapse
+        of the trust score on critical-subnet events that already have other
+        penalties applied. The separate _apply_asset_sensitivity step has been
+        removed and merged here so the scope of amplification is explicit.
+        """
         fused = ml_profile.get("fused_risk", 0.5)
         weight = self.config["ml_risk_weight"]
-        penalty = fused * weight
+        base_penalty = fused * weight
+
+        # Resolve asset sensitivity multiplier
+        tiers = self.config.get("asset_sensitivity_tiers", {})
+        dst_ip = str(telemetry.get("dstip", ""))
+        multiplier = tiers.get("DEFAULT", 1.0)
+        matched_tier = "DEFAULT"
+        for prefix, m in tiers.items():
+            if prefix == "DEFAULT":
+                continue
+            if dst_ip.startswith(prefix):
+                multiplier = m
+                matched_tier = prefix
+                break
+
+        penalty = base_penalty * multiplier
+
+        reason = f"fused_risk={fused:.4f} × weight={weight:.2f}"
+        if multiplier != 1.0:
+            reason += (
+                f" × asset_multiplier={multiplier} (tier '{matched_tier}')"
+                f" → base_penalty={base_penalty:.4f}, amplified={penalty:.4f}"
+            )
 
         factors.append(TrustFactor(
             name="ml_fused_risk",
             delta=-penalty,
-            reason=f"fused_risk={fused:.4f} × weight={weight:.2f}"
+            reason=reason
         ))
         return score - penalty, factors
 
@@ -352,36 +384,6 @@ class PolicyAgent:
             score -= penalty
 
         return score, factors, violations
-
-    def _apply_asset_sensitivity(
-        self, score: float, factors: list, telemetry: dict
-    ) -> tuple:
-        tiers = self.config.get("asset_sensitivity_tiers", {})
-        dst_ip = str(telemetry.get("dstip", ""))
-
-        multiplier = tiers.get("DEFAULT", 1.0)
-        matched_tier = "DEFAULT"
-        for prefix, m in tiers.items():
-            if prefix == "DEFAULT":
-                continue
-            if dst_ip.startswith(prefix):
-                multiplier = m
-                matched_tier = prefix
-                break
-
-        if multiplier != 1.0:
-            # The multiplier amplifies the existing penalties already applied.
-            # We record the delta relative to the current score.
-            amplified_score = 1.0 - (1.0 - score) * multiplier
-            delta = amplified_score - score
-            factors.append(TrustFactor(
-                name="asset_sensitivity",
-                delta=round(delta, 6),
-                reason=f"dst_ip matches tier '{matched_tier}' (multiplier={multiplier})"
-            ))
-            score = amplified_score
-
-        return score, factors
 
     def _apply_time_policy(
         self, score: float, factors: list, violations: list
