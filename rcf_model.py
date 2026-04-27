@@ -23,6 +23,9 @@ class RCF:
         # cannot erode detection sensitivity by growing the history buffer unboundedly.
         self.history = deque(maxlen=smoothing_window)
         self._is_fitted = False
+        # Percentile anchors for score normalization — set at end of fit_predict.
+        self._score_p1 = None
+        self._score_p99 = None
 
     def _insert_point_and_score(self, x):
         """Phase 1: Inserts point permanently and returns raw score."""
@@ -50,7 +53,27 @@ class RCF:
         return float(np.mean(scores))
 
     def _normalize_score(self, raw_score):
-        return 1.0 / (1.0 + np.exp(-np.log1p(raw_score)))
+        """
+        Maps a raw codisp score to [0, 1].
+
+        The fixed sigmoid (1 / (1 + exp(-log1p(raw)))) saturates near 0.98
+        for any codisp value above ~50, which is common in UNSW-NB15.
+        This makes normal and attack traffic indistinguishable at the output
+        layer and collapses the meta-learner threshold toward zero.
+
+        When _score_p1 and _score_p99 are available (set after fit_predict
+        finishes), we use a linear percentile stretch instead:
+            normalized = clip((raw - p1) / (p99 - p1), 0, 1)
+        This maps the 1st-percentile score to ~0.0 and the 99th to ~1.0,
+        preserving the full dynamic range without saturation.
+        Falls back to the sigmoid only during fit_predict before calibration.
+        """
+        if self._score_p1 is not None and self._score_p99 is not None:
+            span = self._score_p99 - self._score_p1
+            if span > 0:
+                return float(np.clip((raw_score - self._score_p1) / span, 0.0, 1.0))
+        # Pre-calibration fallback (only hit during fit_predict before stats are set)
+        return float(1.0 / (1.0 + np.exp(-np.log1p(raw_score))))
 
     def _smooth_score(self, score):
         # FIX (Issue 2): deque(maxlen=N) automatically evicts oldest entry —
@@ -77,17 +100,23 @@ class RCF:
         but are real values the meta-learner can learn from.
         """
         print(f"Building RRCF Forest ({self.num_trees} trees)...")
-        scores = []
+        raw_scores = []
         X_array = np.asarray(X)
         
         for x in tqdm.tqdm(X_array, desc="RRCF Training & Scoring"):
             self.index += 1
             raw_score = self._insert_point_and_score(x)
-            norm_score = self._normalize_score(raw_score)
-            scores.append(norm_score)  # Always append the real score
-                
+            raw_scores.append(raw_score)
+
+        # Calibrate percentile anchors on the training distribution before
+        # normalizing. This stretches the score range so normal traffic maps
+        # near 0 and genuine anomalies map near 1, preventing sigmoid saturation.
+        raw_array = np.array(raw_scores)
+        self._score_p1  = float(np.percentile(raw_array, 1))
+        self._score_p99 = float(np.percentile(raw_array, 99))
+
         self._is_fitted = True
-        return np.array(scores)
+        return np.array([self._normalize_score(r) for r in raw_scores])
 
     def predict_proba(self, X, smooth=False):
         """
@@ -134,6 +163,8 @@ class RCF:
         self.index = 0
         self.history = deque(maxlen=self.smoothing_window)
         self._is_fitted = False
+        self._score_p1 = None
+        self._score_p99 = None
 
     # --- PERSISTENCE METHODS ---
     def save_model(self, filepath=r"Saves/rcf_base.pkl"):
@@ -149,11 +180,11 @@ class RCF:
             'smoothing_window': self.smoothing_window,
             'forest': self.forest,
             'index': self.index,
-            # FIX (Issue 4): Persist history so the loaded model resumes with a
-            # warm smoothing context rather than a cold-start deque. Without this,
-            # the first `smoothing_window` live predictions after loading have a
-            # systematic cold-start bias toward lower (less anomalous) scores.
             'history': list(self.history),
+            # Percentile anchors must travel with the model so predict_proba
+            # uses the same normalization scale as fit_predict.
+            'score_p1':  self._score_p1,
+            'score_p99': self._score_p99,
         }
         with open(filepath, 'wb') as f:
             pickle.dump(state, f)
@@ -175,10 +206,11 @@ class RCF:
         )
         instance.forest = state['forest']
         instance.index = state['index']
-        # FIX (Issue 4): Restore history as a bounded deque, not a plain list,
-        # so the smoothing window behaves identically to the trained instance.
-        # .get() with a fallback handles pkl files saved before this fix.
         instance.history = deque(state.get('history', []), maxlen=state['smoothing_window'])
+        # Restore percentile anchors so normalization is consistent with training.
+        # .get() fallback handles pkl files saved before this fix (uses sigmoid).
+        instance._score_p1  = state.get('score_p1')
+        instance._score_p99 = state.get('score_p99')
         instance._is_fitted = True
         
         print(f"RCF state successfully loaded from {filepath}")

@@ -1,6 +1,6 @@
 {
     "_comment": "Edit this file to reflect your organisation's Zero Trust policy.",
-    "ml_risk_weight": 0.5,
+    "ml_risk_weight": 0.3,
     "threat_class_penalties": {
         "Normal": 0.0,
         "Generic": 0.2,

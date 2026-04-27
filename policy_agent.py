@@ -62,7 +62,12 @@ _DEFAULT_POLICY_CONFIG = {
     "_comment": "Edit this file to reflect your organisation's Zero Trust policy.",
 
     # --- ML risk weighting ---
-    "ml_risk_weight": 0.50,          # how much fused_risk penalizes trust (0–1)
+    "ml_risk_weight": 0.30,          # how much fused_risk penalizes trust (0-1)
+                                     # At 0.50 a fused_risk of 0.98 applies a 0.49
+                                     # penalty alone, leaving almost no headroom for
+                                     # threat-class, memory, time, and volume factors.
+                                     # 0.30 caps the ML penalty at 0.30 and lets the
+                                     # other deterministic signals contribute meaningfully.
 
     # --- Threat classification penalties ---
     # Keys must match attack_cat labels from your dataset.

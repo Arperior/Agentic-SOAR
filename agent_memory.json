@@ -1,33 +1,34 @@
 {
     "dynamic_allowlist": [],
     "active_quarantines": [
-        "tcp_ftp_FIN"
+        "tcp_ftp_FIN",
+        "tcp_-_FIN"
     ],
     "trust_scores": {
         "tcp_-_FIN": {
-            "latest": 0.4895,
-            "previous": 0.0745,
-            "evaluated_at": "2026-04-28T02:54:17.469058",
+            "latest": 0.0,
+            "previous": 0.0,
+            "evaluated_at": "2026-04-28T04:24:19.082310",
             "violations": [
                 "UNAPPROVED_COMBO: tcp_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
+                "AFTER_HOURS_ACCESS: event at 04:xx local time"
             ]
         },
         "tcp_ftp_FIN": {
-            "latest": 0.01,
-            "previous": null,
-            "evaluated_at": "2026-04-28T02:53:48.051820",
+            "latest": 0.0,
+            "previous": 0.01,
+            "evaluated_at": "2026-04-28T04:23:20.610250",
             "violations": [
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
+                "AFTER_HOURS_ACCESS: event at 04:xx local time"
             ]
         },
         "arp_-_CON": {
-            "latest": 0.4845,
-            "previous": 0.4845,
-            "evaluated_at": "2026-04-28T02:54:17.472060",
+            "latest": 0.4892,
+            "previous": 0.4892,
+            "evaluated_at": "2026-04-28T04:25:07.802412",
             "violations": [
                 "UNAPPROVED_COMBO: arp_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
+                "AFTER_HOURS_ACCESS: event at 04:xx local time"
             ]
         },
         "arp_-_INT": {

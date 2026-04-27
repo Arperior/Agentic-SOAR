@@ -54,7 +54,7 @@ class CostSensitiveMetaLearner:
 
         n_samples, n_features = X_scaled.shape
         self.weights = np.zeros(n_features)
-        self.bias = 0
+        self.bias = 0.0   # float from the start; avoids numpy.float64 in saved state
         y = np.array(y)
 
         # 2. Map SOC Penalties directly into the gradients
