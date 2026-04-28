@@ -152,7 +152,9 @@ def _incident_entropy(incident_proba: np.ndarray) -> np.ndarray:
     2-weight logistic model.
     """
     # Clip to avoid log(0); incident_proba rows should already sum to 1.0
-    p = np.clip(incident_proba, 1e-12, 1.0)
+    # Ensure perfect sum to 1.0 before clipping to prevent floating-point drift
+    p_norm = incident_proba / np.sum(incident_proba, axis=1, keepdims=True)
+    p = np.clip(p_norm, 1e-12, 1.0)
     return -np.sum(p * np.log(p), axis=1)
 
 

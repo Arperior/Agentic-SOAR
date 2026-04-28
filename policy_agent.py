@@ -111,7 +111,8 @@ _DEFAULT_POLICY_CONFIG = {
     # Empty list = whitelist disabled.
     "approved_proto_service_combos": [
         "tcp_http", "tcp_https", "tcp_ftp", "udp_dns",
-        "tcp_smtp", "tcp_ssh", "tcp_rdp", "udp_ntp"
+        "tcp_smtp", "tcp_ssh", "tcp_rdp", "udp_ntp",
+        "tcp_-", "udp_-", "icmp_-"   # FIX: Allow raw transport/network protocols to prevent instant 0.0 trust
     ],
     "unapproved_combo_penalty": 0.10,
 

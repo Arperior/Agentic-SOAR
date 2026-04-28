@@ -219,13 +219,13 @@ class ZeroTrustSOARAgent:
         rcf_score = ml_profile.get("anomaly_risk", 0.0)
         if rcf_score <= threshold:
             print(
-                f"\n[RCF Gate]   anomaly_risk={rcf_score:.4f} ≤ threshold={threshold} "
+                f"\n[RCF Gate]   anomaly_risk={rcf_score:.4f} ≤ threshold={threshold:.4f} "
                 f"→ Benign, logging only."
             )
             return self._log_benign_event(event_id, context)
 
         print(
-            f"\n[RCF Gate]   anomaly_risk={rcf_score:.4f} > threshold={threshold} "
+            f"\n[RCF Gate]   anomaly_risk={rcf_score:.4f} > threshold={threshold:.4f} "
             f"→ Escalating to Policy Agent."
         )
 
@@ -439,20 +439,22 @@ class ZeroTrustSOARAgent:
         # 0.89+ (at default threshold 0.7448) triggers full containment; scores
         # between the threshold and 0.89 go to STEP_UP_AUTH unless the threat
         # class is explicitly non-Normal/non-DoS.
-        isolation_trigger = optimal_threshold + 0.15
+        isolation_trigger = optimal_threshold + 0.25
 
         system_prompt = f"""
         You are an AI SOC Analyst evaluating network telemetry and ML risk scores.
         Your goal is to enforce Zero Trust while preventing alert fatigue.
 
+        CRITICAL DIRECTIVE: DO NOT blindly trust the ML 'predicted_threat_classification'. 
+        ML models often misclassify benign background noise or connection teardowns as attacks 
+        (e.g., calling a 4-packet TCP FIN a 'Fuzzer'). You must cross-examine the ML prediction 
+        against the raw packet counts, protocols, and states in the telemetry.
+
         EVALUATION RULES (apply in order, first match wins):
         1. IF 'fused_risk' <= {mfa_trigger:.4f} AND 'predicted_threat_classification' == "Normal":
            Playbook is 'ALLOW' (is_false_positive: true).
-           This is a confirmed false positive — the ML flagged it but the threat
-           class and low risk both indicate benign traffic.
         2. IF 'fused_risk' <= {mfa_trigger:.4f} AND 'predicted_threat_classification' != "Normal":
            Playbook is 'ALLOW' (is_false_positive: false).
-           Low risk score overrides the non-Normal class — log only.
         3. IF 'predicted_threat_classification' == "DoS":
            Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).
         4. IF 'fused_risk' > {isolation_trigger:.4f}:
@@ -465,6 +467,41 @@ class ZeroTrustSOARAgent:
              Playbook is 'ALLOW' (is_false_positive: true).
            Otherwise:
              Playbook is 'STEP_UP_AUTH' (is_false_positive: false).
+
+        --- TRAINING EXAMPLES (FEW-SHOT) ---
+
+        [Example 1: The TCP Teardown False Positive]
+        Context: {{"ml_risk_profile": {{"fused_risk": 0.89}}, "predicted_threat_classification": "Fuzzers", "network_telemetry": {{"proto": "tcp", "state": "FIN", "spkts": 4, "dpkts": 4}}}}
+        Output: {{
+            "reasoning": "Standard TCP FIN teardown with very low packet count. ML misclassification of 'Fuzzers'. Rule 5 overridden due to benign telemetry.",
+            "playbook": "ALLOW",
+            "is_false_positive": true
+        }}
+
+        [Example 2: The True Stealth Reconnaissance]
+        Context: {{"ml_risk_profile": {{"fused_risk": 0.85}}, "predicted_threat_classification": "Reconnaissance", "network_telemetry": {{"proto": "udp", "state": "INT", "spkts": 250, "dpkts": 0}}}}
+        Output: {{
+            "reasoning": "High outbound UDP packet volume with zero response confirms unidirectional scanning. Rule 5 applies.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false
+        }}
+
+        [Example 3: The True Volumetric Attack]
+        Context: {{"ml_risk_profile": {{"fused_risk": 0.99}}, "predicted_threat_classification": "DoS", "network_telemetry": {{"proto": "tcp", "state": "REQ", "spkts": 15000, "dpkts": 200}}}}
+        Output: {{
+            "reasoning": "Massive packet asymmetry and high anomaly scores confirm volumetric DoS. Rule 3 applies.",
+            "playbook": "RATE_LIMIT_DOS",
+            "is_false_positive": false
+        }}
+
+        [Example 4: The Benign High-Privilege Admin]
+        Context: {{"ml_risk_profile": {{"fused_risk": 0.10}}, "predicted_threat_classification": "Normal", "network_telemetry": {{"proto": "tcp", "service": "ssh", "spkts": 50, "dpkts": 60}}}}
+        Output: {{
+            "reasoning": "Bidirectional SSH traffic with low risk scores and Normal threat class. Rule 1 applies.",
+            "playbook": "ALLOW",
+            "is_false_positive": false
+        }}
+        --- END EXAMPLES ---
 
         OUTPUT CONSTRAINTS:
         Output ONLY a raw JSON object. No markdown, no preamble. Reasoning: 1-2 concise technical sentences.
@@ -495,6 +532,7 @@ class ZeroTrustSOARAgent:
             response.raise_for_status()
             raw_text = response.json()["response"]
 
+            # Excellent existing logic to strip out the <think> tags from DeepSeek models
             cleaned = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
             for fence in ("```json", "```"):
                 if cleaned.startswith(fence):
