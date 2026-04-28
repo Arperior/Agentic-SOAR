@@ -4,6 +4,7 @@ import tqdm
 import dill as pickle
 import os
 from collections import deque
+import uuid
 
 class RCF:
     """
@@ -43,7 +44,8 @@ class RCF:
     def _score_blind(self, x):
         """Phase 4 & 5: Temporarily inserts to score, then deletes (Zero Leakage)."""
         scores = []
-        temp_index = "temp_eval_node"
+        # FIX: Generate a unique ID for this specific thread's evaluation
+        temp_index = f"temp_eval_{uuid.uuid4().hex}" 
         
         for tree in self.forest:
             tree.insert_point(x, index=temp_index)
@@ -98,7 +100,7 @@ class RCF:
 
     # --- CORE API METHODS ---
 
-    def fit_predict(self, X):
+    def fit_predict(self, X,global_p1=None, global_p99=None):
         """
         Phase 1 (Training): Builds the baseline forest from normal traffic.
 
@@ -132,8 +134,14 @@ class RCF:
         # features were generated on a different score scale than what the final
         # RCF produces at test time, inflating the train→test cost gap.
         raw_array = np.array(raw_scores)
-        self._score_p1  = float(np.percentile(raw_array, 1))
-        self._score_p99 = float(np.percentile(raw_array, 99))
+        # FIX: If global anchors are provided (from the full-train model), use them!
+        # Otherwise, calculate them locally.
+        if global_p1 is not None and global_p99 is not None:
+            self._score_p1 = global_p1
+            self._score_p99 = global_p99
+        else:
+            self._score_p1  = float(np.percentile(raw_array, 1))
+            self._score_p99 = float(np.percentile(raw_array, 99))
 
         print(
             f"[RCF] Calibration anchors — "

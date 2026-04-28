@@ -85,10 +85,13 @@ class CostSensitiveMetaLearner:
             raise RuntimeError("[ERROR] Meta-Learner must be fitted before predicting.")
         self._validate_input(X)
         
-        # ISSUE 5 FIX: Strictly .transform() to prevent testing data variance from leaking
         X_scaled = self.scaler.transform(X)
         linear_model = np.dot(X_scaled, self.weights) + self.bias
-        return self._sigmoid(linear_model)
+        raw_prob = self._sigmoid(linear_model)
+        
+        # FIX (Section 2, Issue 2): Clip the floating point to strictly [0.0, 1.0]
+        # This prevents edge-case inputs from outputting 1.0000000000000002
+        return np.clip(raw_prob, 0.0, 1.0)
 
     # --- PERSISTENCE METHODS ---
     def save_model(self, filepath="Saves/meta_learner.pkl"):

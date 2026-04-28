@@ -164,19 +164,19 @@ class ZeroTrustSOARAgent:
         self.trust_threshold = self.policy_agent.config.get("trust_score_threshold", 0.40)
 
     def _load_threshold(self, threshold_file: str, fallback: float = 0.5) -> float:
-        """
-        Reads the threshold saved by find_optimal_threshold() in utils.py.
-        Uses fallback only when the file doesn't exist yet (pre-training).
-        """
         if not os.path.exists(threshold_file):
-            print(
-                f"[ZeroTrustSOARAgent] WARNING: threshold file '{threshold_file}' not found. "
-                f"Falling back to {fallback}. Run training (core.ipynb) to generate it."
-            )
             return fallback
 
         with open(threshold_file, "r") as f:
             record = json.load(f)
+
+        # FIX: Catch the silent fallback flag and warn the SOC
+        if record.get("is_fallback", False):
+            print(
+                f"\n[CRITICAL WARNING] The optimal threshold file indicates a fallback to 0.5. "
+                f"The ML pipeline failed to meet the minimum precision floor during training. "
+                f"Retraining is highly recommended!\n"
+            )
 
         threshold = record.get("optimal_threshold", fallback)
         cost = record.get("soc_cost")
@@ -253,7 +253,8 @@ class ZeroTrustSOARAgent:
             decision = {
                 "reasoning": (
                     f"Trust score {trust_eval.trust_score:.4f} meets threshold "
-                    f"{threshold}. No escalation required."
+                    # FIX: Print the actual ZTA threshold used, not the ML threshold
+                    f"{self.trust_threshold}. No escalation required." 
                 ),
                 "playbook": "ALLOW",
                 "is_false_positive": False,
@@ -528,7 +529,7 @@ class ZeroTrustSOARAgent:
         }
 
         try:
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, timeout=15)
             response.raise_for_status()
             raw_text = response.json()["response"]
 
@@ -542,6 +543,14 @@ class ZeroTrustSOARAgent:
             cleaned = cleaned.strip()
 
             return json.loads(cleaned)
+        
+        except requests.exceptions.Timeout:
+            print(f"[ERROR] LLM Evaluation Timeout: Ollama did not respond within 15 seconds.")
+            return {
+                "reasoning": "Fail-safe triggered due to LLM evaluation timeout.",
+                "playbook": "NETWORK_ISOLATION",
+                "is_false_positive": False
+            }
 
         except Exception as e:
             print(f"[ERROR] Local LLM Evaluation Failed: {e}")

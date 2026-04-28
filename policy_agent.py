@@ -223,7 +223,7 @@ class PolicyAgent:
         ml_profile = context.get("ml_risk_profile", {})
         threat_type = context.get("predicted_threat_classification", "UNKNOWN")
         behavior_signature = self._get_signature(telemetry)
-
+        event_timestamp = context.get("timestamp", datetime.datetime.now().isoformat())
         score = 1.0   # start at full trust; factors penalize downward
         factors: list[TrustFactor] = []
         violations: list[str] = []
@@ -250,7 +250,7 @@ class PolicyAgent:
 
         # 5. Time-of-day policy
         score, factors, violations = self._apply_time_policy(
-            score, factors, violations
+            score, factors, violations, event_timestamp
         )
 
         # 6. Volume / rate anomaly
@@ -279,13 +279,16 @@ class PolicyAgent:
     def is_trust_acceptable(
         self,
         trust_eval: TrustEvaluation,
-        threshold: float = 0.5
+        threshold: float = None
     ) -> bool:
         """
-        The Zero Trust Evaluation diamond from the flowchart.
-        Mutates trust_eval.is_acceptable in place so downstream
-        code and audit logs always have the verdict attached.
+        The Zero Trust Evaluation 
+        If threshold is omitted, resolves securely from policy_config.
         """
+        # FIX: Resolve securely instead of hardcoding 0.5 in the signature
+        if threshold is None:
+            threshold = self.config.get("trust_score_threshold", 0.40)
+            
         result = trust_eval.trust_score >= threshold
         trust_eval.is_acceptable = result
         return result
@@ -409,10 +412,15 @@ class PolicyAgent:
         return score, factors, violations
 
     def _apply_time_policy(
-        self, score: float, factors: list, violations: list
-    ) -> tuple:
+        self, score: float, factors: list, violations: list, event_timestamp: str) -> tuple:
         hours = self.config.get("business_hours", {"start": 8, "end": 20})
-        current_hour = datetime.datetime.now().hour
+        
+        # FIX: Parse the hour directly from the event's ISO timestamp
+        try:
+            event_time = datetime.datetime.fromisoformat(event_timestamp)
+            current_hour = event_time.hour
+        except ValueError:
+            current_hour = datetime.datetime.now().hour # Fallback if parsing fails
 
         if not (hours["start"] <= current_hour < hours["end"]):
             penalty = self.config["after_hours_penalty"]

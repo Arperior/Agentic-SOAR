@@ -8,6 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedKFold
 import joblib
+from meta_scorer import _incident_entropy
 
 
 def train_categorical_model(X_cat, y, cat_cols):
@@ -74,7 +75,8 @@ def _transform_num_pipeline(X_num_raw, scaler, pca):
 def generate_oof_features(
     X_cat, X_num_raw, y, cat_cols,
     train_cat_func, rcf_class,
-    train_incident_func=None, n_splits=5, y_multi=None
+    train_incident_func=None, n_splits=5, y_multi=None,
+    global_p1=None, global_p99=None  # FIX: Add global anchors
 ):
     """
     Generates clean, Out-of-Fold predictions to train the Meta-Learner.
@@ -136,7 +138,9 @@ def generate_oof_features(
         # 2. RCF anomaly score (trained on normal traffic only)
         temp_rcf = rcf_class(num_trees=40, tree_size=256)
         X_num_tr_normal = X_num_tr[y_tr.values == 0]
-        temp_rcf.fit_predict(X_num_tr_normal)
+        
+        # FIX: Pass the global anchors into the temporary fold's fit_predict
+        temp_rcf.fit_predict(X_num_tr_normal, global_p1=global_p1, global_p99=global_p99)
         oof_rcf[val_idx] = temp_rcf.predict_proba(X_num_val)
 
         # 3. Incident agent entropy (multiclass uncertainty)
@@ -144,6 +148,9 @@ def generate_oof_features(
             y_multi_tr = y_multi_reset.iloc[train_idx]
             temp_incident = train_incident_func(X_cat_tr, y_multi_tr, cat_cols)
             incident_proba_val = temp_incident.predict_proba(X_cat_val)
+            
+            # FIX (Section 2, Issue 1): Use the centralized entropy function
+            oof_incident_entropy[val_idx] = _incident_entropy(incident_proba_val)
             p = np.clip(incident_proba_val, 1e-12, 1.0)
             oof_incident_entropy[val_idx] = -np.sum(p * np.log(p), axis=1)
 
@@ -328,9 +335,11 @@ def find_optimal_threshold(
 
     # Persist so the SOAR agent can load it without re-running training
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+    is_fallback = True if best_cost == np.inf else False
     record = {
         "optimal_threshold": float(best_threshold),
         "soc_cost":          int(best_cost),
+        "is_fallback":         is_fallback,
         "cost_fn":           int(cost_fn),
         "cost_fp":           int(cost_fp),
         "min_precision":     float(min_precision),
