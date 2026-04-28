@@ -31,7 +31,7 @@ Implements the full pipeline from the flowchart:
 
 Changes from previous version
 ------------------------------
-FIX 1 — RCF threshold gate: run() now implements the "Is Anomaly Score >
+FIX 1 — RCF threshold gate: run() implements the "Is Anomaly Score >
          Threshold?" diamond at the top of the flowchart. Events that fall
          below the RCF threshold are logged and returned early without
          ever reaching the Policy Agent or LLM.
@@ -51,6 +51,37 @@ FIX 3 — Removed redundant fast-path checks from evaluate_incident. The
 
 FIX 4 — execute_playbook now receives and logs the full TrustEvaluation
          dict so the Splunk ingest step can carry the complete audit trail.
+
+FIX 5 (Issue 1 — Dynamic allowlist never populated): evaluate_incident
+         Rule 1 previously set is_false_positive: false for ALL low-risk
+         ALLOW decisions, so _trigger_feedback_loop's condition
+         (playbook=="ALLOW" and is_fp==True) was never satisfied.
+         Rule 1 now sets is_false_positive: true when fused_risk is low
+         AND threat classification is Normal — these are genuine FPs that
+         should be memorised and fast-pathed on future encounters.
+
+FIX 6 (Issue 2 — Agent flags everything as attack / overtune): The ML
+         optimal_threshold (a binary classification boundary tuned on
+         probability outputs) was being reused as the ZeroTrust trust score
+         floor. The trust score starts at 1.0 and accumulates penalties from
+         5+ independent policy signals — using 0.7448 as the floor meant any
+         event with an unapproved protocol + after-hours access was
+         permanently below threshold regardless of ML scores, routing 100%
+         of escalated events to the LLM which then applied NETWORK_ISOLATION
+         by default.
+         Fix: self.trust_threshold is now loaded from policy_config.json
+         ("trust_score_threshold", default 0.40) and used exclusively for
+         the ZeroTrust diamond. The ML optimal_threshold is used exclusively
+         for the RCF gate. These two thresholds operate on completely
+         different scales and must never be the same value.
+
+FIX 7 (Issue 2 — isolation_trigger arithmetic bug): The old formula
+         min(optimal_threshold + 0.35, 0.75) evaluated to 0.75 when
+         optimal_threshold=0.7448, which is BELOW the detection threshold.
+         Rule 3 therefore fired for virtually every event reaching the LLM.
+         isolation_trigger is now optimal_threshold + 0.15, placing full
+         containment only at genuinely high-risk scores (≥0.895 at the
+         default threshold).
 """
 
 import json
@@ -118,6 +149,20 @@ class ZeroTrustSOARAgent:
         # Falls back to 0.5 only if the file is missing (e.g. first run before training).
         self.optimal_threshold = self._load_threshold(threshold_file)
 
+        # FIX (Issue 2 — Overtune): The ML optimal_threshold (tuned for binary
+        # classification on a 0-1 probability output) must NOT double as the
+        # ZeroTrust diamond floor.  The trust score is a completely different
+        # quantity — it starts at 1.0 and accumulates additive penalties from
+        # 5+ independent policy signals.  Using 0.7448 as the trust floor means
+        # nearly every event with any violation (unapproved proto, after-hours,
+        # non-Normal threat class) is permanently unacceptable regardless of how
+        # benign the ML scores are, causing the LLM to see every escalated event
+        # and apply NETWORK_ISOLATION by default.
+        # The trust_threshold is loaded from policy_config.json ("trust_score_threshold")
+        # and defaults to 0.40 — a value calibrated to the PolicyAgent's penalty
+        # budget (max total penalties for a clean low-risk event ≈ 0.30–0.40).
+        self.trust_threshold = self.policy_agent.config.get("trust_score_threshold", 0.40)
+
     def _load_threshold(self, threshold_file: str, fallback: float = 0.5) -> float:
         """
         Reads the threshold saved by find_optimal_threshold() in utils.py.
@@ -169,9 +214,8 @@ class ZeroTrustSOARAgent:
         ml_profile = context["ml_risk_profile"]
 
         # ── Stage 1: RCF Anomaly Gate (flowchart diamond #1) ──────────
-        # FIX 1: This gate was missing. Events below the RCF threshold
-        # are logged and returned early — Policy Agent and LLM are never
-        # invoked, matching the "No → Log" branch in the flowchart.
+        # Uses the ML-optimised threshold — this is the correct domain for it.
+        # Events below the RCF threshold are logged and returned early.
         rcf_score = ml_profile.get("anomaly_risk", 0.0)
         if rcf_score <= threshold:
             print(
@@ -200,8 +244,12 @@ class ZeroTrustSOARAgent:
             print(f"              Violations: {', '.join(trust_eval.policy_violations)}")
 
         # ── Stage 3: Zero Trust Evaluation (flowchart diamond #2) ─────
-        if self.policy_agent.is_trust_acceptable(trust_eval, threshold=threshold):
-            print(f"[ZeroTrust]  Trust ACCEPTABLE (≥ {threshold}) → ALLOW fast-path")
+        # FIX (Issue 2): Uses self.trust_threshold (loaded from policy_config.json,
+        # default 0.40), NOT the ML optimal_threshold.  The trust score starts at
+        # 1.0 and is penalised by multiple independent policy signals — mapping the
+        # ML binary threshold onto this scale causes near-universal failure.
+        if self.policy_agent.is_trust_acceptable(trust_eval, threshold=self.trust_threshold):
+            print(f"[ZeroTrust]  Trust ACCEPTABLE (≥ {self.trust_threshold}) → ALLOW fast-path")
             decision = {
                 "reasoning": (
                     f"Trust score {trust_eval.trust_score:.4f} meets threshold "
@@ -212,7 +260,7 @@ class ZeroTrustSOARAgent:
                 "trust_eval": trust_eval.to_dict()
             }
         else:
-            print(f"[ZeroTrust]  Trust UNACCEPTABLE (< {threshold}) → Response Agent")
+            print(f"[ZeroTrust]  Trust UNACCEPTABLE (< {self.trust_threshold}) → Response Agent")
 
             # ── Stage 4: Response Agent (LLM) ─────────────────────────
             decision = self.evaluate_incident(context, threshold)
@@ -365,30 +413,61 @@ class ZeroTrustSOARAgent:
         LLM-based Response Agent (DeepSeek-R1 via Ollama).
         Only called when PolicyAgent deems trust unacceptable.
 
-        FIX 3: Removed the redundant allowlist/quarantine fast-path checks
-        that previously duplicated PolicyAgent._apply_memory_signals logic.
-        PolicyAgent is now the single source of truth for memory signals.
-        Any signature in quarantine or on the allowlist will already have
-        had its trust score crushed/boosted by the PolicyAgent, causing the
-        ZeroTrust diamond to route correctly before this method is reached.
+        FIX (Issue 1 — Allowlist never populated): The original Rule 1 set
+        is_false_positive: false for all low-risk ALLOW decisions, so the
+        feedback loop condition (playbook=="ALLOW" and is_fp==True) was never
+        satisfied and the dynamic allowlist stayed empty forever.  Rule 1 now
+        sets is_false_positive: true when fused_risk is low AND the threat
+        classification is Normal — these are the confirmed false positives that
+        should be remembered and fast-pathed on future encounters.
+
+        FIX (Issue 2 — isolation_trigger arithmetic): The old formula was
+        min(optimal_threshold + 0.35, 0.75).  When optimal_threshold=0.7448,
+        this evaluates to min(1.0948, 0.75)=0.75, which is LOWER than the
+        optimal_threshold itself.  Rule 3 then fired for almost every event
+        that reached the LLM (fused_risk > 0.75), producing wall-to-wall
+        NETWORK_ISOLATION.  The trigger is now set to a fixed offset ABOVE
+        the optimal_threshold so it only fires on genuinely high-risk events.
+
+        FIX (Issue 3 — Removed redundant fast-path checks): already in place
+        from the previous fix pass; PolicyAgent remains the single source of
+        truth for memory signals.
         """
         mfa_trigger = optimal_threshold
-        isolation_trigger = min(optimal_threshold + 0.35, 0.75)
+        # Isolation fires only when fused_risk is materially above the detection
+        # boundary — not just barely over it.  A 0.15 offset means a score of
+        # 0.89+ (at default threshold 0.7448) triggers full containment; scores
+        # between the threshold and 0.89 go to STEP_UP_AUTH unless the threat
+        # class is explicitly non-Normal/non-DoS.
+        isolation_trigger = optimal_threshold + 0.15
 
         system_prompt = f"""
         You are an AI SOC Analyst evaluating network telemetry and ML risk scores.
         Your goal is to enforce Zero Trust while preventing alert fatigue.
 
-        EVALUATION RULES:
-        1. IF 'fused_risk' <= {mfa_trigger}: Playbook is 'ALLOW' (is_false_positive: false).
-        2. IF 'predicted_threat_classification' == "DoS": Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).
-        3. IF 'fused_risk' > {isolation_trigger} OR ('predicted_threat_classification' != "Normal" AND 'predicted_threat_classification' != "DoS"): Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).
-        4. IF 'fused_risk' > {mfa_trigger} AND 'predicted_threat_classification' == "Normal":
-           - Inspect 'network_telemetry'. If traffic is standard and benign (e.g., 'service' is http/ftp/dns AND 'state' indicates a clean close like FIN), OVERRIDE the ML: Playbook is 'ALLOW' (is_false_positive: true).
-           - If traffic behaves ambiguously: Playbook is 'STEP_UP_AUTH' (is_false_positive: false).
+        EVALUATION RULES (apply in order, first match wins):
+        1. IF 'fused_risk' <= {mfa_trigger:.4f} AND 'predicted_threat_classification' == "Normal":
+           Playbook is 'ALLOW' (is_false_positive: true).
+           This is a confirmed false positive — the ML flagged it but the threat
+           class and low risk both indicate benign traffic.
+        2. IF 'fused_risk' <= {mfa_trigger:.4f} AND 'predicted_threat_classification' != "Normal":
+           Playbook is 'ALLOW' (is_false_positive: false).
+           Low risk score overrides the non-Normal class — log only.
+        3. IF 'predicted_threat_classification' == "DoS":
+           Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).
+        4. IF 'fused_risk' > {isolation_trigger:.4f}:
+           Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).
+        5. IF 'predicted_threat_classification' != "Normal" AND 'predicted_threat_classification' != "DoS":
+           Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).
+        6. IF 'fused_risk' > {mfa_trigger:.4f} AND 'predicted_threat_classification' == "Normal":
+           Inspect 'network_telemetry'. If traffic is standard and benign
+           (service is http/ftp/dns AND state is a clean close like FIN/CLO):
+             Playbook is 'ALLOW' (is_false_positive: true).
+           Otherwise:
+             Playbook is 'STEP_UP_AUTH' (is_false_positive: false).
 
         OUTPUT CONSTRAINTS:
-        Output ONLY a raw JSON object. No markdown. Reasoning: 1-2 concise technical sentences.
+        Output ONLY a raw JSON object. No markdown, no preamble. Reasoning: 1-2 concise technical sentences.
 
         {{
             "reasoning": "...",

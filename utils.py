@@ -231,7 +231,7 @@ def find_optimal_threshold(
     cost_fn: int = 10,
     cost_fp: int = 2,
     n_thresholds: int = 1000,
-    min_precision: float = 0.70,
+    min_precision: float = 0.80,
     save_path: str = "Saves/optimal_threshold.json"
 ) -> float:
     """
@@ -256,10 +256,13 @@ def find_optimal_threshold(
     n_thresholds  : int    -- number of candidate thresholds to evaluate
     min_precision : float  -- minimum acceptable precision for attack class (0-1).
                              Thresholds below this precision are skipped.
-                             Default 0.70 -- at least 70% of flagged events
+                             Default 0.80 -- at least 80% of flagged events
                              must be real attacks. Raise toward 0.90 to
-                             reduce alert fatigue; lower toward 0.50 to
+                             reduce alert fatigue; lower toward 0.70 to
                              tolerate more FPs in exchange for fewer FNs.
+                             NOTE: raising this value pushes the threshold
+                             higher, which increases FNs. Counter this by
+                             raising cost_fn so recall pressure is maintained.
     save_path     : str    -- where to persist the result (loaded by SOAR agent)
 
     Returns

@@ -169,5 +169,29 @@ def train_fusion_meta_learner(X_train_meta, y_train, COST_FN=10, COST_FP=2, lamb
     )
     meta_model.fit(X_train_meta, y_train)
     
+    # FIX (Issue 3 — CatBoost marginalisation guard): Print the learned weights
+    # so the caller can verify CatBoost's contribution (index 0) is not being
+    # squeezed out by a higher min_precision threshold.
+    # Feature order: [0] CatBoost prob, [1] RCF score, [2] Incident entropy.
+    w = meta_model.weights
+    print(
+        f"\nMeta-Learner weights — "
+        f"CatBoost: {w[0]:.4f}  RCF: {w[1]:.4f}  Entropy: {w[2]:.4f}  "
+        f"Bias: {meta_model.bias:.4f}"
+    )
+    # Warn if CatBoost weight drops below 30% of total absolute weight, which
+    # would indicate the precision floor is suppressing the primary classifier.
+    total_abs = np.sum(np.abs(w))
+    catboost_share = abs(w[0]) / total_abs if total_abs > 0 else 0.0
+    if catboost_share < 0.30:
+        print(
+            f"[WARNING] CatBoost weight share is {catboost_share:.1%} of total — "
+            f"below the 30% floor. The meta-learner may be over-relying on RCF/entropy. "
+            f"Consider increasing COST_FN (currently {COST_FN}) by 2–3 to restore "
+            f"recall pressure, or lowering min_precision in find_optimal_threshold."
+        )
+    else:
+        print(f"CatBoost weight share: {catboost_share:.1%} — healthy contribution.")
+
     print("Meta-Learner Training Complete!")
     return meta_model

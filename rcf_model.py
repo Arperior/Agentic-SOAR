@@ -66,10 +66,25 @@ class RCF:
             normalized = clip((raw - p1) / (p99 - p1), 0, 1)
         This maps the 1st-percentile score to ~0.0 and the 99th to ~1.0,
         preserving the full dynamic range without saturation.
+
+        FIX (Issue 4 — RCF ceiling saturation): The RCF is trained on normal
+        traffic only.  Attack traffic at test time often produces codisp values
+        far above the training p99, so the clip at 1.0 causes many attack rows
+        to saturate at exactly 1.0000 — collapsing the score distribution and
+        making them indistinguishable from each other.  To give the meta-learner
+        more signal above the 99th percentile, the ceiling is relaxed to
+        _score_p99 * 1.5 (a 50% headroom above the highest normal-traffic score
+        seen during training).  This spreads the high-anomaly region from a
+        single cliff edge at 1.0 into a graded ramp, while still capping the
+        very highest outliers to prevent unbounded scores from destabilising the
+        meta-learner's logistic function.
         Falls back to the sigmoid only during fit_predict before calibration.
         """
         if self._score_p1 is not None and self._score_p99 is not None:
-            span = self._score_p99 - self._score_p1
+            # FIX: use p99 * 1.5 as ceiling to reduce attack-score saturation.
+            # p1 stays as floor (maps the lowest normal scores to ~0.0).
+            effective_ceiling = self._score_p99 * 1.5
+            span = effective_ceiling - self._score_p1
             if span > 0:
                 return float(np.clip((raw_score - self._score_p1) / span, 0.0, 1.0))
         # Pre-calibration fallback (only hit during fit_predict before stats are set)
@@ -111,9 +126,21 @@ class RCF:
         # Calibrate percentile anchors on the training distribution before
         # normalizing. This stretches the score range so normal traffic maps
         # near 0 and genuine anomalies map near 1, preventing sigmoid saturation.
+        # FIX (Issue 5 — OOF/test cost gap): Print the anchors so the caller
+        # can compare per-fold anchors (from generate_oof_features) against the
+        # final full-train RCF anchors.  A large divergence means OOF meta-learner
+        # features were generated on a different score scale than what the final
+        # RCF produces at test time, inflating the train→test cost gap.
         raw_array = np.array(raw_scores)
         self._score_p1  = float(np.percentile(raw_array, 1))
         self._score_p99 = float(np.percentile(raw_array, 99))
+
+        print(
+            f"[RCF] Calibration anchors — "
+            f"p1={self._score_p1:.4f}  p99={self._score_p99:.4f}  "
+            f"effective_ceiling={self._score_p99 * 1.5:.4f}  "
+            f"n_samples={len(raw_array)}"
+        )
 
         self._is_fitted = True
         return np.array([self._normalize_score(r) for r in raw_scores])
@@ -123,6 +150,11 @@ class RCF:
         Phase 4 (Batch Testing): Scores unseen data blindly.
         smooth=False guarantees order-independent, i.i.d evaluation and matches
         the distribution used during OOF generation in fit_predict().
+
+        FIX (Issue 4): Prints a saturation diagnostic after scoring so the caller
+        can verify that attack scores are not collapsing to 1.0000 en masse.
+        If "% at ceiling" is above ~15%, the effective_ceiling in _normalize_score
+        should be increased (e.g. p99 * 2.0) or the RCF retrained.
         """
         if not self._is_fitted:
             raise RuntimeError("[ERROR] RCF Model must be fitted before predicting.")
@@ -138,8 +170,25 @@ class RCF:
                 scores.append(self._smooth_score(norm_score))
             else:
                 scores.append(norm_score)
-            
-        return np.array(scores)
+
+        score_array = np.array(scores)
+
+        # --- Saturation diagnostic ---
+        pct_ceiling = (score_array >= 0.999).mean() * 100
+        print(
+            f"\n[RCF] Score distribution — "
+            f"min={score_array.min():.4f}  mean={score_array.mean():.4f}  "
+            f"max={score_array.max():.4f}  "
+            f"% at ceiling (≥0.999): {pct_ceiling:.1f}%"
+        )
+        if pct_ceiling > 15.0:
+            print(
+                f"[RCF] WARNING: {pct_ceiling:.1f}% of scores saturated at ceiling. "
+                f"Consider increasing effective_ceiling multiplier in _normalize_score "
+                f"(currently p99 × 1.5) or retraining with a wider score range."
+            )
+
+        return score_array
 
     def score(self, x, smooth=True):
         """

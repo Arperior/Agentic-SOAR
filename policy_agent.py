@@ -61,6 +61,23 @@ class TrustEvaluation:
 _DEFAULT_POLICY_CONFIG = {
     "_comment": "Edit this file to reflect your organisation's Zero Trust policy.",
 
+    # --- Trust score decision threshold ---
+    # This is the floor the ZeroTrust diamond tests against — completely
+    # separate from the ML optimal_threshold used for the RCF gate.
+    # The trust score starts at 1.0 and is reduced by additive penalties:
+    #   ml_risk (up to 0.30) + threat_class (0.15–0.45) + proto_combo (0.10)
+    #   + after_hours (0.10) + volume (0.10) + categorical_risk (0.10)
+    # A clean low-risk Normal event with one minor violation accumulates
+    # roughly 0.26+0.00+0.10+0.10 = 0.46 in penalties → score 0.54.
+    # Setting the floor at 0.40 means: any event that clears the ML check
+    # AND has a Normal threat class AND has ≤2 minor policy violations will
+    # ALLOW without reaching the LLM.  Events with quarantine history,
+    # high-severity threat classes, or high ML risk will still fail.
+    # Raise toward 0.60 for a stricter posture; lower toward 0.25 for more
+    # LLM bypass.  Do NOT copy the ML optimal_threshold here — that value
+    # lives on a completely different 0-1 probability scale.
+    "trust_score_threshold": 0.40,
+
     # --- ML risk weighting ---
     "ml_risk_weight": 0.30,          # how much fused_risk penalizes trust (0-1)
                                      # At 0.50 a fused_risk of 0.98 applies a 0.49
