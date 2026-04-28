@@ -213,19 +213,20 @@ class ZeroTrustSOARAgent:
         telemetry = context["network_telemetry"]
         ml_profile = context["ml_risk_profile"]
 
-        # ── Stage 1: RCF Anomaly Gate (flowchart diamond #1) ──────────
+        # ── Stage 1: Fused ML Gate (flowchart diamond #1) ──────────
         # Uses the ML-optimised threshold — this is the correct domain for it.
-        # Events below the RCF threshold are logged and returned early.
-        rcf_score = ml_profile.get("anomaly_risk", 0.0)
-        if rcf_score <= threshold:
+        # Events below the fused threshold are logged and returned early.
+        fused_score = ml_profile.get("fused_risk", 0.0)
+        
+        if fused_score <= threshold:
             print(
-                f"\n[RCF Gate]   anomaly_risk={rcf_score:.4f} ≤ threshold={threshold:.4f} "
+                f"\n[ML Gate]   fused_risk={fused_score:.4f} ≤ threshold={threshold:.4f} "
                 f"→ Benign, logging only."
             )
             return self._log_benign_event(event_id, context)
 
         print(
-            f"\n[RCF Gate]   anomaly_risk={rcf_score:.4f} > threshold={threshold:.4f} "
+            f"\n[ML Gate]   fused_risk={fused_score:.4f} > threshold={threshold:.4f} "
             f"→ Escalating to Policy Agent."
         )
 
@@ -253,11 +254,10 @@ class ZeroTrustSOARAgent:
             decision = {
                 "reasoning": (
                     f"Trust score {trust_eval.trust_score:.4f} meets threshold "
-                    # FIX: Print the actual ZTA threshold used, not the ML threshold
                     f"{self.trust_threshold}. No escalation required." 
                 ),
                 "playbook": "ALLOW",
-                "is_false_positive": False,
+                "is_false_positive": True,   # FIX: Acknowledge that the ML Gate made a mistake
                 "trust_eval": trust_eval.to_dict()
             }
         else:
