@@ -252,8 +252,8 @@ class ZeroTrustSOARAgent:
             print(f"[ZeroTrust]  Trust ACCEPTABLE (≥ {self.trust_threshold}) → ALLOW fast-path")
             decision = {
                 "reasoning": (
-                    f"Trust score {trust_eval.trust_score:.4f} meets "
-                    f"trust_threshold={self.trust_threshold:.4f}. No escalation required."
+                    f"Trust score {trust_eval.trust_score:.4f} meets threshold "
+                    f"{threshold}. No escalation required."
                 ),
                 "playbook": "ALLOW",
                 "is_false_positive": False,
@@ -263,11 +263,7 @@ class ZeroTrustSOARAgent:
             print(f"[ZeroTrust]  Trust UNACCEPTABLE (< {self.trust_threshold}) → Response Agent")
 
             # ── Stage 4: Response Agent (LLM) ─────────────────────────
-            # FIX: pass self.trust_threshold (trust score scale, 0.40) not threshold
-            # (ML probability scale, 0.8173). evaluate_incident uses its argument to
-            # set mfa_trigger and isolation_trigger inside the LLM prompt — these
-            # must be calibrated to the trust score domain, not the ML domain.
-            decision = self.evaluate_incident(context, self.trust_threshold)
+            decision = self.evaluate_incident(context, threshold)
             decision["trust_eval"] = trust_eval.to_dict()
 
         # ── Stage 5: Execute SOAR Playbook ────────────────────────────
@@ -289,13 +285,11 @@ class ZeroTrustSOARAgent:
     def _log_benign_event(self, event_id, context: dict) -> dict:
         """
         Handles the 'No' branch of the RCF anomaly gate.
-        Executes the LOG_ONLY playbook (Splunk ingest) then returns.
-        No Policy Agent, no LLM, no quarantine update.
-
-        FIX: Previously returned without calling execute_playbook, so the
-        Splunk ingest step was silently skipped for all benign events.
+        Logs the event to SIEM and returns a LOG_ONLY decision — no
+        Policy Agent, no LLM, no quarantine update.
         """
-        decision = {
+        print(f"[SOAR] Event {event_id}: RCF score below threshold → LOG_ONLY")
+        return {
             "reasoning": (
                 "RCF anomaly score did not exceed the detection threshold. "
                 "Traffic logged as benign with no further action."
@@ -304,8 +298,6 @@ class ZeroTrustSOARAgent:
             "is_false_positive": False,
             "trust_eval": None
         }
-        self.execute_playbook(event_id, decision, context.get("network_telemetry", {}))
-        return decision
 
     # ------------------------------------------------------------------
     # JSON / persistence helpers

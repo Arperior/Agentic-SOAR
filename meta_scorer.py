@@ -67,13 +67,8 @@ class CostSensitiveMetaLearner:
             weighted_error = (y_predicted - y) * sample_weights
 
             # 3. Calculate Gradients with L2 Penalty
-            # Bias is regularized at a reduced rate (lambda/10) to prevent the
-            # degenerate high-bias solution. Without it, asymmetric sample_weights
-            # (cost_fn=12 vs cost_fp=2) push bias to ~1.95 so sigmoid(bias alone)
-            # is ~0.875 before any features contribute — collapsing the threshold
-            # to the very top of the score range and causing high FN counts.
             dw = (1 / n_samples) * np.dot(X_scaled.T, weighted_error) + (self.lambda_reg / n_samples) * self.weights
-            db = (1 / n_samples) * np.sum(weighted_error) + (self.lambda_reg / (n_samples * 10)) * self.bias
+            db = (1 / n_samples) * np.sum(weighted_error)
 
             # 4. Convergence Monitoring
             if np.max(np.abs(dw)) < self.epsilon and abs(db) < self.epsilon:
