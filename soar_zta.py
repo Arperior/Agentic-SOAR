@@ -529,7 +529,7 @@ class ZeroTrustSOARAgent:
         }
 
         try:
-            response = requests.post(url, json=payload, timeout=15)
+            response = requests.post(url, json=payload)
             response.raise_for_status()
             raw_text = response.json()["response"]
 
