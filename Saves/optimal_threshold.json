@@ -1,14 +1,14 @@
 {
-    "optimal_threshold": 0.7447547547547547,
-    "soc_cost": 39116,
-    "cost_fn": 10,
+    "optimal_threshold": 0.8173473473473473,
+    "soc_cost": 69428,
+    "cost_fn": 12,
     "cost_fp": 2,
-    "min_precision": 0.75,
-    "achieved_precision": 0.7502958980081837,
+    "min_precision": 0.8,
+    "achieved_precision": 0.8006015329387794,
     "confusion": {
-        "tn": 22232,
-        "fp": 14768,
-        "fn": 958,
-        "tp": 44374
+        "tn": 26724,
+        "fp": 10276,
+        "fn": 4073,
+        "tp": 41259
     }
 }

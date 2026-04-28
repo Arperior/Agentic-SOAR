@@ -225,50 +225,53 @@ def prepare_datasets(file_path, is_train=False):
     return X_cat, X_num, X_num_raw, labels_binary, categorical_cols, labels_multiclass
 
 
+
 def find_optimal_threshold(
     y_true,
     risk_scores,
     cost_fn: int = 10,
     cost_fp: int = 2,
     n_thresholds: int = 1000,
-    min_precision: float = 0.80,
+    min_precision: float = 0.75,
+    min_recall: float = 0.80,
     save_path: str = "Saves/optimal_threshold.json"
 ) -> float:
     """
     Sweeps decision thresholds and returns the one that minimises the
-    asymmetric SOC cost function:  cost = (FN × cost_fn) + (FP × cost_fp),
-    subject to a minimum precision floor.
+    asymmetric SOC cost function:  cost = (FN x cost_fn) + (FP x cost_fp),
+    subject to both a minimum precision AND minimum recall floor.
 
-    Without a precision constraint, pure cost minimisation degenerates toward
-    "flag everything" whenever attacks outnumber normals: each missed attack
-    costs cost_fn while each false alarm only costs cost_fp, so setting the
-    threshold near zero minimises raw cost but produces operationally useless
-    results (near-100% FP rate). The min_precision floor prevents this by
-    rejecting any threshold whose attack-prediction precision falls below the
-    specified value.
+    Two-sided constraint rationale
+    --------------------------------
+    Precision floor alone: the optimiser can push the threshold arbitrarily
+    high to satisfy precision, sacrificing recall (many missed attacks).
+    With cost_fn=12 this is dangerous — seen in the 0.8173 threshold result
+    which produced FN=13,578 on the test set.
+
+    Recall floor alone: degenerates toward "flag everything" at near-zero
+    threshold, producing massive alert fatigue.
+
+    Both floors together constrain the threshold to a viable operating region:
+    at least min_recall attacks are caught AND at least min_precision of
+    flagged events are real attacks.
 
     Parameters
     ----------
-    y_true        : array-like of int   -- ground-truth binary labels (0/1)
-    risk_scores   : array-like of float -- meta-learner output probabilities
+    y_true        : array-like of int
+    risk_scores   : array-like of float
     cost_fn       : int    -- penalty per missed attack (False Negative)
     cost_fp       : int    -- penalty per false alarm   (False Positive)
     n_thresholds  : int    -- number of candidate thresholds to evaluate
-    min_precision : float  -- minimum acceptable precision for attack class (0-1).
-                             Thresholds below this precision are skipped.
-                             Default 0.80 -- at least 80% of flagged events
-                             must be real attacks. Raise toward 0.90 to
-                             reduce alert fatigue; lower toward 0.70 to
-                             tolerate more FPs in exchange for fewer FNs.
-                             NOTE: raising this value pushes the threshold
-                             higher, which increases FNs. Counter this by
-                             raising cost_fn so recall pressure is maintained.
-    save_path     : str    -- where to persist the result (loaded by SOAR agent)
+    min_precision : float  -- min TP/(TP+FP). Default 0.75.
+    min_recall    : float  -- min TP/(TP+FN). Default 0.80. Ensures the
+                             threshold does not climb so high that recall
+                             collapses — the primary failure mode observed
+                             when using precision floor alone.
+    save_path     : str
 
     Returns
     -------
-    float -- the threshold value in [0, 1] that minimises total SOC cost
-             while satisfying the precision floor
+    float -- threshold in [0, 1] minimising SOC cost within both floors
     """
     y_true = np.asarray(y_true)
     risk_scores = np.asarray(risk_scores)
@@ -278,22 +281,29 @@ def find_optimal_threshold(
     best_cost = np.inf
     best_tn = best_fp = best_fn = best_tp = 0
     best_precision = 0.0
-    n_skipped = 0
+    best_recall_val = 0.0
+    n_skipped_prec = 0
+    n_skipped_rec = 0
 
     for t in thresholds:
         preds = (risk_scores >= t).astype(int)
         tn, fp, fn, tp = confusion_matrix(y_true, preds).ravel()
 
-        # Precision = TP / (TP + FP); guard against zero-division when
-        # no positives are predicted (very high threshold).
         predicted_positives = tp + fp
+        actual_positives = tp + fn
+
         if predicted_positives == 0:
-            n_skipped += 1
+            n_skipped_prec += 1
             continue
 
         precision = tp / predicted_positives
         if precision < min_precision:
-            n_skipped += 1
+            n_skipped_prec += 1
+            continue
+
+        recall = tp / actual_positives if actual_positives > 0 else 0.0
+        if recall < min_recall:
+            n_skipped_rec += 1
             continue
 
         cost = (fn * cost_fn) + (fp * cost_fp)
@@ -301,40 +311,49 @@ def find_optimal_threshold(
             best_cost = cost
             best_threshold = float(t)
             best_precision = float(precision)
+            best_recall_val = float(recall)
             best_tn, best_fp, best_fn, best_tp = tn, fp, fn, tp
 
     if best_cost == np.inf:
-        # No threshold satisfied the precision floor -- fall back to 0.5
-        # and warn loudly so the caller knows the constraint was too tight.
+        # Relax recall floor by 0.10 and retry rather than silently falling back to 0.5
+        relaxed_recall = max(min_recall - 0.10, 0.50)
         print(
-            f"\n[WARNING] No threshold satisfied min_precision={min_precision:.2f}. "
-            f"All {n_thresholds} candidates were skipped. "
-            f"Falling back to 0.5 -- consider lowering min_precision."
+            f"\n[WARNING] No threshold satisfied precision>={min_precision:.2f} "
+            f"AND recall>={min_recall:.2f}. "
+            f"Retrying with recall floor relaxed to {relaxed_recall:.2f}..."
         )
-        best_threshold = 0.5
-        preds = (risk_scores >= 0.5).astype(int)
-        best_tn, best_fp, best_fn, best_tp = confusion_matrix(y_true, preds).ravel()
-        best_cost = int((best_fn * cost_fn) + (best_fp * cost_fp))
-        best_precision = float(best_tp / max(best_tp + best_fp, 1))
+        return find_optimal_threshold(
+            y_true, risk_scores,
+            cost_fn=cost_fn, cost_fp=cost_fp,
+            n_thresholds=n_thresholds,
+            min_precision=min_precision,
+            min_recall=relaxed_recall,
+            save_path=save_path
+        )
 
+    n_skipped_total = n_skipped_prec + n_skipped_rec
     print("\n--- THRESHOLD OPTIMISATION (OOF) ---")
-    print(f"Sweep range    : 0.01 - 0.99 ({n_thresholds} candidates, {n_skipped} below precision floor)")
+    print(f"Sweep range    : 0.01 - 0.99 ({n_thresholds} candidates, {n_skipped_total} skipped)")
+    print(f"  {n_skipped_prec} failed precision floor ({min_precision:.2f}), "
+          f"{n_skipped_rec} failed recall floor ({min_recall:.2f})")
     print(f"Cost function  : (FN x {cost_fn}) + (FP x {cost_fp})")
-    print(f"Precision floor: {min_precision:.2f} (min fraction of flagged events that must be real attacks)")
     print(f"Optimal threshold    : {best_threshold:.4f}")
-    print(f"Precision @ threshold: {best_precision:.4f}")
+    print(f"Precision @ threshold: {best_precision:.4f}  (floor: {min_precision:.2f})")
+    print(f"Recall    @ threshold: {best_recall_val:.4f}  (floor: {min_recall:.2f})")
     print(f"Minimum SOC cost     : {best_cost}")
     print(f"  TN={best_tn}  FP={best_fp}  FN={best_fn}  TP={best_tp}")
 
     # Persist so the SOAR agent can load it without re-running training
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
     record = {
-        "optimal_threshold": float(best_threshold),
-        "soc_cost":          int(best_cost),
-        "cost_fn":           int(cost_fn),
-        "cost_fp":           int(cost_fp),
-        "min_precision":     float(min_precision),
+        "optimal_threshold":  float(best_threshold),
+        "soc_cost":           int(best_cost),
+        "cost_fn":            int(cost_fn),
+        "cost_fp":            int(cost_fp),
+        "min_precision":      float(min_precision),
+        "min_recall":         float(min_recall),
         "achieved_precision": float(best_precision),
+        "achieved_recall":    float(best_recall_val),
         "confusion": {
             "tn": int(best_tn), "fp": int(best_fp),
             "fn": int(best_fn), "tp": int(best_tp)
