@@ -1,52 +1,57 @@
 {
     "dynamic_allowlist": [],
     "active_quarantines": [
-        "tcp_ftp_CON",
-        "tcp_-_FIN",
         "tcp_ftp_FIN"
     ],
     "trust_scores": {
         "tcp_-_FIN": {
-            "latest": 0.0,
-            "previous": 0.0,
-            "evaluated_at": "2026-04-29T00:48:50.183760",
+            "latest": 0.8886,
+            "previous": 0.8904,
+            "evaluated_at": "2026-04-29T01:45:42.901806",
             "violations": [
-                "UNAPPROVED_COMBO: tcp_-",
-                "AFTER_HOURS_ACCESS: event at 00:xx local time"
+                "AFTER_HOURS_ACCESS: event at 01:xx local time"
             ]
         },
         "tcp_ftp_FIN": {
-            "latest": 0.0,
-            "previous": 0.0,
-            "evaluated_at": "2026-04-29T00:48:03.725867",
+            "latest": 0.4886,
+            "previous": 0.2036,
+            "evaluated_at": "2026-04-29T01:45:42.908323",
             "violations": [
-                "AFTER_HOURS_ACCESS: event at 00:xx local time"
-            ]
-        },
-        "arp_-_CON": {
-            "latest": 0.4892,
-            "previous": 0.4892,
-            "evaluated_at": "2026-04-28T04:25:07.802412",
-            "violations": [
-                "UNAPPROVED_COMBO: arp_-",
-                "AFTER_HOURS_ACCESS: event at 04:xx local time"
-            ]
-        },
-        "arp_-_INT": {
-            "latest": 0.4835,
-            "previous": 0.484,
-            "evaluated_at": "2026-04-28T02:54:17.471061",
-            "violations": [
-                "UNAPPROVED_COMBO: arp_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
+                "AFTER_HOURS_ACCESS: event at 01:xx local time"
             ]
         },
         "tcp_ftp_CON": {
-            "latest": 0.3453,
+            "latest": 0.6453,
             "previous": null,
-            "evaluated_at": "2026-04-29T00:45:08.755644",
+            "evaluated_at": "2026-04-29T01:45:42.876226",
             "violations": [
-                "AFTER_HOURS_ACCESS: event at 00:xx local time"
+                "AFTER_HOURS_ACCESS: event at 01:xx local time"
+            ]
+        },
+        "arp_-_CON": {
+            "latest": 0.7853,
+            "previous": 0.7874,
+            "evaluated_at": "2026-04-29T01:45:42.897494",
+            "violations": [
+                "UNAPPROVED_COMBO: arp_-",
+                "AFTER_HOURS_ACCESS: event at 01:xx local time"
+            ]
+        },
+        "tcp_http_FIN": {
+            "latest": 0.8886,
+            "previous": 0.8886,
+            "evaluated_at": "2026-04-29T01:45:42.903732",
+            "violations": [
+                "AFTER_HOURS_ACCESS: event at 01:xx local time"
+            ]
+        },
+        "tcp_ftp-data_FIN": {
+            "latest": 0.7898,
+            "previous": null,
+            "evaluated_at": "2026-04-29T01:45:42.899802",
+            "violations": [
+                "UNAPPROVED_COMBO: tcp_ftp-data",
+                "AFTER_HOURS_ACCESS: event at 01:xx local time"
             ]
         }
     }

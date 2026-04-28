@@ -440,7 +440,7 @@ class ZeroTrustSOARAgent:
         # 0.89+ (at default threshold 0.7448) triggers full containment; scores
         # between the threshold and 0.89 go to STEP_UP_AUTH unless the threat
         # class is explicitly non-Normal/non-DoS.
-        isolation_trigger = optimal_threshold + 0.25
+        isolation_trigger = min(optimal_threshold + 0.15, 0.90)
 
         system_prompt = f"""
         You are an AI SOC Analyst evaluating network telemetry and ML risk scores.

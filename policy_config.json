@@ -1,5 +1,6 @@
 {
     "_comment": "Edit this file to reflect your organisation's Zero Trust policy.",
+    "trust_score_threshold": 0.4,
     "ml_risk_weight": 0.3,
     "threat_class_penalties": {
         "Normal": 0.0,
@@ -24,7 +25,10 @@
         "tcp_smtp",
         "tcp_ssh",
         "tcp_rdp",
-        "udp_ntp"
+        "udp_ntp",
+        "tcp_-",
+        "udp_-",
+        "icmp_-"
     ],
     "unapproved_combo_penalty": 0.1,
     "asset_sensitivity_tiers": {
@@ -44,6 +48,5 @@
     "high_categorical_risk_threshold": 0.7,
     "high_categorical_risk_penalty": 0.1,
     "score_floor": 0.0,
-    "score_ceiling": 1.0,
-    "trust_score_threshold": 0.4
+    "score_ceiling": 1.0
 }
