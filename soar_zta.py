@@ -255,15 +255,27 @@ class ZeroTrustSOARAgent:
         grey_zone_limit = 0.85 
         is_below_grey_zone = fused_score < grey_zone_limit
 
+        # Only flag as a false positive (and thus allowlist the signature) when
+        # the fused score is well below the detection boundary — not just anywhere
+        # under the grey-zone ceiling.  A score that barely clears the ML threshold
+        # but still passes the trust check should be ALLOWed without being memorised,
+        # because its risk profile could easily flip on the next encounter.
+        LOW_RISK_CEILING = threshold * 0.75  # e.g. 0.558 at default threshold 0.7448
+        is_genuinely_low_risk = fused_score < LOW_RISK_CEILING
+
         if is_trust_ok and is_below_grey_zone:
             print(f"[ZeroTrust]  Trust ACCEPTABLE (≥ {self.trust_threshold}) AND Risk < 0.85 → ALLOW fast-path")
             decision = {
                 "reasoning": (
                     f"Trust score {trust_eval.trust_score:.4f} meets threshold "
-                    f"{self.trust_threshold}. No escalation required." 
+                    f"{self.trust_threshold}. No escalation required."
                 ),
                 "playbook": "ALLOW",
-                "is_false_positive": True,   
+                # Mark as FP (and allowlist) only when fused_risk is comfortably
+                # below the detection boundary.  Mid-range scores that happen to
+                # pass the trust check are allowed but NOT memorised — their risk
+                # profile is too ambiguous for a permanent fast-path exemption.
+                "is_false_positive": is_genuinely_low_risk,
                 "trust_eval": trust_eval.to_dict()
             }
         else:
@@ -516,9 +528,9 @@ class ZeroTrustSOARAgent:
         [Example 4: The Benign High-Privilege Admin]
         Context: {{"ml_risk_profile": {{"fused_risk": 0.10}}, "predicted_threat_classification": "Normal", "network_telemetry": {{"proto": "tcp", "service": "ssh", "spkts": 50, "dpkts": 60}}}}
         Output: {{
-            "reasoning": "Bidirectional SSH traffic with low risk scores and Normal threat class. Rule 1 applies.",
+            "reasoning": "Bidirectional SSH traffic with low risk scores and Normal threat class. Rule 1 applies — confirmed false positive, signature memorised for fast-path.",
             "playbook": "ALLOW",
-            "is_false_positive": false
+            "is_false_positive": true
         }}
         --- END EXAMPLES ---
 
@@ -545,7 +557,6 @@ class ZeroTrustSOARAgent:
             "stream": False,
             "options": {
                 "temperature": 0.0,
-                "num_predict": 1000  # <--- FIX: Force it to be fast and concise
             }
         }
 
@@ -554,14 +565,15 @@ class ZeroTrustSOARAgent:
             response.raise_for_status()
             raw_text = response.json()["response"]
 
-            # Excellent existing logic to strip out the <think> tags from DeepSeek models
-            cleaned = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
-            for fence in ("```json", "```"):
-                if cleaned.startswith(fence):
-                    cleaned = cleaned[len(fence):]
-            if cleaned.endswith("```"):
-                cleaned = cleaned[:-3]
-            cleaned = cleaned.strip()
+            # 1. Strip think tags (even if the model got cut off and forgot the closing tag)
+            cleaned = re.sub(r"<think>.*?(?:</think>|$)", "", raw_text, flags=re.DOTALL).strip()
+            
+            # 2. Aggressively hunt for the JSON object in whatever text is left
+            json_match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+            if json_match:
+                cleaned = json_match.group(0)
+            else:
+                raise ValueError("No JSON object found in LLM output.")
 
             return json.loads(cleaned)
         
@@ -570,7 +582,8 @@ class ZeroTrustSOARAgent:
             return {
                 "reasoning": "Fail-safe triggered due to LLM evaluation timeout.",
                 "playbook": "NETWORK_ISOLATION",
-                "is_false_positive": False
+                "is_false_positive": False,
+                "is_llm_failsafe": True   # prevents PlaybookEditorAgent writing rules from this decision
             }
 
         except Exception as e:
@@ -578,7 +591,8 @@ class ZeroTrustSOARAgent:
             return {
                 "reasoning": "Fail-safe triggered due to LLM evaluation timeout/error.",
                 "playbook": "NETWORK_ISOLATION",
-                "is_false_positive": False
+                "is_false_positive": False,
+                "is_llm_failsafe": True   # prevents PlaybookEditorAgent writing rules from this decision
             }
 
     # ------------------------------------------------------------------

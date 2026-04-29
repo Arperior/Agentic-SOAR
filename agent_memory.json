@@ -3,18 +3,18 @@
         "udp_-_INT"
     ],
     "active_quarantines": [
-        "tcp_-_FIN",
-        "tcp_ftp_FIN",
+        "iso-ip_-_INT",
+        "ib_-_INT",
         "encap_-_INT",
         "unas_-_INT",
-        "ospf_-_REQ",
-        "iso-ip_-_INT",
         "vmtp_-_INT",
-        "udp_dns_INT",
-        "tcp_http_FIN",
-        "sprite-rpc_-_INT",
         "tcp_smtp_FIN",
-        "ib_-_INT"
+        "sprite-rpc_-_INT",
+        "tcp_http_FIN",
+        "ospf_-_REQ",
+        "udp_dns_INT",
+        "tcp_ftp_FIN",
+        "tcp_-_FIN"
     ],
     "trust_scores": {
         "tcp_ftp_FIN": {
@@ -26,13 +26,13 @@
         "udp_dns_INT": {
             "latest": 0.0006,
             "previous": 0.0009,
-            "evaluated_at": "2026-04-30T01:21:10.408704",
+            "evaluated_at": "2026-04-30T02:13:28.684405",
             "violations": []
         },
         "tcp_-_FIN": {
-            "latest": 0.1291,
-            "previous": 0.1549,
-            "evaluated_at": "2026-04-30T01:22:01.310906",
+            "latest": 0.6956,
+            "previous": 0.1285,
+            "evaluated_at": "2026-04-30T02:15:49.418546",
             "violations": []
         },
         "tcp_smtp_FIN": {
@@ -51,8 +51,8 @@
         },
         "udp_-_INT": {
             "latest": 0.4657,
-            "previous": 0.4633,
-            "evaluated_at": "2026-04-30T01:05:26.782244",
+            "previous": 0.4657,
+            "evaluated_at": "2026-04-30T02:16:26.468696",
             "violations": [
                 "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold"
             ]

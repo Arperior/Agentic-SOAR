@@ -130,6 +130,18 @@ class PlaybookEditorAgent:
         """
         event_id = int(event_id) if hasattr(event_id, "item") else event_id
 
+        # Do not write rules or update quarantine when the isolation decision came
+        # from the LLM fail-safe (empty/timeout response).  A fail-safe fires
+        # because Ollama was unreachable — it carries zero diagnostic signal and
+        # must never be used to anchor a patch rule or permanently quarantine a
+        # signature.  The event will be re-evaluated on the next run once the LLM
+        # recovers.
+        if decision.get("is_llm_failsafe"):
+            print(f"\n[PlaybookEditorAgent] \u26a0 Skipping FN self-healing for Event {event_id} "
+                  f"\u2014 isolation was triggered by LLM fail-safe, not a genuine model decision.")
+            return None
+
+
         print(f"\n{'='*60}")
         print(f"[PlaybookEditorAgent] \u26a0 FALSE NEGATIVE \u2014 Missed Attack for Event {event_id}")
         print(f"  AI decided  : {decision.get('playbook')} \u2014 {decision.get('reasoning', '')[:80]}")
@@ -210,6 +222,18 @@ class PlaybookEditorAgent:
         CorrectionRecord
         """
         event_id = int(event_id) if hasattr(event_id, "item") else event_id
+
+        # Fail-safe decisions (LLM timeout / empty response) carry no diagnostic
+        # signal — the isolation was a precautionary default, not a model judgement.
+        # Writing an ALLOW rule or allowlisting the signature on the basis of a
+        # fail-safe would permanently exempt that signature from scrutiny on
+        # grounds of a network error, not actual benign behaviour.
+        if decision.get("is_llm_failsafe"):
+            print(f"\n[PlaybookEditorAgent] \u26a0 Skipping FP self-healing for Event {event_id} "
+                  f"\u2014 NETWORK_ISOLATION was triggered by LLM fail-safe, not a genuine model decision. "
+                  f"No rule written, no allowlist update.")
+            return None
+
 
         print(f"\n{'='*60}")
         print(f"[PlaybookEditorAgent] Triggering Autonomous Self-Healing for Event {event_id}")

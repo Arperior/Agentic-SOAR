@@ -1,6 +1,15 @@
 {
     "routing_rules": [
         {
+            "id": "LEARNED_003",
+            "condition": "proto=tcp AND state=FIN AND spkts=20.0 AND dpkts=12.0",
+            "playbook": "ALLOW",
+            "is_fp": true,
+            "rationale": "Allows specific benign TCP FIN packets with packet counts to prevent false positive isolation.",
+            "created_at": "2026-04-30T02:15:49.402530",
+            "source": "PlaybookEditorAgent"
+        },
+        {
             "id": "FN_PATCH_002",
             "condition": "IF proto == \"tcp\" AND state == \"FIN\" AND threat_class == \"Fuzzers\"",
             "playbook": "NETWORK_ISOLATION",
@@ -129,6 +138,12 @@
             "event_id": 61394,
             "trigger": "Autonomous_Evaluation_FN",
             "appended_at": "2026-04-30T01:14:59.164222"
+        },
+        {
+            "rule_id": "LEARNED_003",
+            "event_id": 74562,
+            "trigger": "Autonomous_Evaluation_FP",
+            "appended_at": "2026-04-30T02:15:49.402530"
         }
     ]
 }
