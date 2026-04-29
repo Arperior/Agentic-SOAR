@@ -480,6 +480,9 @@ class ZeroTrustSOARAgent:
         system_prompt = f"""
         You are an AI SOC Analyst evaluating network telemetry and ML risk scores.
         Your goal is to enforce Zero Trust while preventing alert fatigue.
+        OUTPUT CONSTRAINTS:
+        CRITICAL INSTRUCTION: DO NOT USE <think> TAGS. DO NOT OUTPUT ANY REASONING OUTSIDE THE JSON.
+        Output ONLY a raw JSON object. No markdown, no preamble. Reasoning: 1-2 concise technical sentences.
 
         EVALUATION RULES (apply in order, first match wins):
         {rules_text}
@@ -540,11 +543,14 @@ class ZeroTrustSOARAgent:
             "system": system_prompt,
             "prompt": user_prompt,
             "stream": False,
-            "options": {"temperature": 0.0}
+            "options": {
+                "temperature": 0.0,
+                "num_predict": 1000  # <--- FIX: Force it to be fast and concise
+            }
         }
 
         try:
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, timeout=240)
             response.raise_for_status()
             raw_text = response.json()["response"]
 
@@ -560,7 +566,7 @@ class ZeroTrustSOARAgent:
             return json.loads(cleaned)
         
         except requests.exceptions.Timeout:
-            print(f"[ERROR] LLM Evaluation Timeout: Ollama did not respond within 15 seconds.")
+            print(f"[ERROR] LLM Evaluation Timeout: Ollama did not respond within 240 seconds.")
             return {
                 "reasoning": "Fail-safe triggered due to LLM evaluation timeout.",
                 "playbook": "NETWORK_ISOLATION",

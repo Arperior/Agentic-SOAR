@@ -1,45 +1,116 @@
 {
     "dynamic_allowlist": [
-        "tcp_-_FIN"
+        "udp_-_INT"
     ],
     "active_quarantines": [
-        "tcp_smtp_FIN",
-        "udp_dns_INT",
         "tcp_-_FIN",
+        "tcp_ftp_FIN",
+        "encap_-_INT",
+        "unas_-_INT",
+        "ospf_-_REQ",
+        "iso-ip_-_INT",
         "vmtp_-_INT",
-        "tcp_ftp_FIN"
+        "udp_dns_INT",
+        "tcp_http_FIN",
+        "sprite-rpc_-_INT",
+        "tcp_smtp_FIN",
+        "ib_-_INT"
     ],
     "trust_scores": {
         "tcp_ftp_FIN": {
-            "latest": 0.0108,
-            "previous": 0.0108,
-            "evaluated_at": "2026-04-29T23:07:57.555567",
+            "latest": 0.0,
+            "previous": 0.4114,
+            "evaluated_at": "2026-04-30T00:15:32.506762",
             "violations": []
         },
         "udp_dns_INT": {
-            "latest": 0.0009,
-            "previous": 0.0006,
-            "evaluated_at": "2026-04-29T23:10:14.570492",
+            "latest": 0.0006,
+            "previous": 0.0009,
+            "evaluated_at": "2026-04-30T01:21:10.408704",
             "violations": []
         },
         "tcp_-_FIN": {
-            "latest": 0.1531,
-            "previous": 0.1561,
-            "evaluated_at": "2026-04-29T23:11:26.921345",
+            "latest": 0.1291,
+            "previous": 0.1549,
+            "evaluated_at": "2026-04-30T01:22:01.310906",
             "violations": []
         },
         "tcp_smtp_FIN": {
-            "latest": 0.3009,
-            "previous": null,
-            "evaluated_at": "2026-04-29T22:32:31.162414",
+            "latest": 0.0,
+            "previous": 0.3009,
+            "evaluated_at": "2026-04-30T00:48:41.916909",
             "violations": []
         },
         "vmtp_-_INT": {
-            "latest": 0.3503,
+            "latest": 0.3506,
             "previous": null,
-            "evaluated_at": "2026-04-29T22:34:08.930774",
+            "evaluated_at": "2026-04-30T00:15:56.077767",
             "violations": [
                 "UNAPPROVED_COMBO: vmtp_-"
+            ]
+        },
+        "udp_-_INT": {
+            "latest": 0.4657,
+            "previous": 0.4633,
+            "evaluated_at": "2026-04-30T01:05:26.782244",
+            "violations": [
+                "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold"
+            ]
+        },
+        "tcp_http_FIN": {
+            "latest": 0.0,
+            "previous": 0.0,
+            "evaluated_at": "2026-04-30T00:46:29.746879",
+            "violations": [
+                "HIGH_SEVERITY_THREAT: Worms exceeds critical threshold"
+            ]
+        },
+        "unas_-_INT": {
+            "latest": 0.0,
+            "previous": 0.0,
+            "evaluated_at": "2026-04-30T00:48:14.693602",
+            "violations": [
+                "UNAPPROVED_COMBO: unas_-"
+            ]
+        },
+        "encap_-_INT": {
+            "latest": 0.3506,
+            "previous": null,
+            "evaluated_at": "2026-04-30T00:34:19.238863",
+            "violations": [
+                "UNAPPROVED_COMBO: encap_-"
+            ]
+        },
+        "sprite-rpc_-_INT": {
+            "latest": 0.3506,
+            "previous": null,
+            "evaluated_at": "2026-04-30T00:43:53.941641",
+            "violations": [
+                "UNAPPROVED_COMBO: sprite-rpc_-"
+            ]
+        },
+        "ib_-_INT": {
+            "latest": 0.3506,
+            "previous": null,
+            "evaluated_at": "2026-04-30T00:45:58.898006",
+            "violations": [
+                "UNAPPROVED_COMBO: ib_-"
+            ]
+        },
+        "ospf_-_REQ": {
+            "latest": 0.3503,
+            "previous": null,
+            "evaluated_at": "2026-04-30T00:52:36.622596",
+            "violations": [
+                "UNAPPROVED_COMBO: ospf_-"
+            ]
+        },
+        "iso-ip_-_INT": {
+            "latest": 0.3506,
+            "previous": null,
+            "evaluated_at": "2026-04-30T00:55:15.514531",
+            "violations": [
+                "UNAPPROVED_COMBO: iso-ip_-"
             ]
         }
     }

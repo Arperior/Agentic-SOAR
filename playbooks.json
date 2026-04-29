@@ -1,5 +1,23 @@
 {
     "routing_rules": [
+        {
+            "id": "FN_PATCH_002",
+            "condition": "IF proto == \"tcp\" AND state == \"FIN\" AND threat_class == \"Fuzzers\"",
+            "playbook": "NETWORK_ISOLATION",
+            "is_fn": true,
+            "rationale": "This rule detects Fuzzer attacks with a TCP FIN state, which was the missed pattern, by classifying them as NETWORK_ISOLATION to prevent similar False Negatives.",
+            "created_at": "2026-04-30T01:14:59.164222",
+            "source": "PlaybookEditorAgent"
+        },
+        {
+            "id": "LEARNED_001",
+            "condition": "IF proto == 'tcp' AND state == 'FIN'",
+            "playbook": "ALLOW",
+            "is_fp": true,
+            "rationale": "This rule allows benign TCP traffic with a FIN state, which was misclassified as fuzzing activity, thereby preventing the high fused_risk score from incorrectly flagging normal traffic.",
+            "created_at": "2026-04-30T01:04:55.330667",
+            "source": "PlaybookEditorAgent"
+        },
         "1. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Playbook is 'ALLOW' (is_false_positive: true).",
         "2. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' != 'Normal': Playbook is 'ALLOW' (is_false_positive: false).",
         "3. IF 'predicted_threat_classification' == 'DoS': Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).",
@@ -98,5 +116,19 @@
                 "severity": "High"
             }
         ]
-    }
+    },
+    "learned_rule_audit": [
+        {
+            "rule_id": "LEARNED_001",
+            "event_id": 74562,
+            "trigger": "Autonomous_Evaluation_FP",
+            "appended_at": "2026-04-30T01:04:55.330667"
+        },
+        {
+            "rule_id": "FN_PATCH_002",
+            "event_id": 61394,
+            "trigger": "Autonomous_Evaluation_FN",
+            "appended_at": "2026-04-30T01:14:59.164222"
+        }
+    ]
 }

@@ -1,3 +1,918 @@
 [
     {
-        "event_id": 
+        "event_id": 66625,
+        "context": {
+            "event_id": 66625,
+            "timestamp": "2026-04-30T00:16:54.023089",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.773,
+                "fused_risk": 0.888
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 31.959324,
+                "spkts": 32.0,
+                "dpkts": 22.0,
+                "sbytes": 1806.0,
+                "dbytes": 1198.0,
+                "rate": 1.658358,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 438.056824,
+                "dload": 286.364014,
+                "sloss": 13.0,
+                "dloss": 7.0,
+                "sinpkt": 1029.826321,
+                "dinpkt": 1520.766,
+                "sjit": 173779.6601,
+                "djit": 6513.6545,
+                "swin": 255.0,
+                "stcpb": 4800930.0,
+                "dtcpb": 3462617910.0,
+                "dwin": 255.0,
+                "tcprtt": 0.050562,
+                "synack": 0.023235,
+                "ackdat": 0.027327,
+                "smean": 56.0,
+                "dmean": 54.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 8.0,
+                "ct_dst_ltm": 3.0,
+                "ct_src_dport_ltm": 3.0,
+                "ct_dst_sport_ltm": 3.0,
+                "ct_dst_src_ltm": 8.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 3.0,
+                "ct_srv_dst": 8.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Predicted threat classification is 'Fuzzers', which is not 'Normal' or 'DoS', triggering NETWORK_ISOLATION. Fused risk score of 0.888 does not exceed 0.9000.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.6836,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.26639999999999997,
+                        "reason": "fused_risk=0.8880 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "allowlist_bonus",
+                        "delta": 0.15,
+                        "reason": "signature 'tcp_-_FIN' was previously verified as benign (FP)"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": true,
+                "evaluated_at": "2026-04-30T00:16:54.023089"
+            }
+        },
+        "new_rule": null,
+        "analysis": "The fused_risk score was artificially elevated due to a high anomaly_risk of 0.773, which misidentified the benign traffic's 'FIN' state as anomalous behavior typical of fuzzers. Trust factors were penalized by negative deltas in ml_fused_risk and threat_classification, reducing the overall trust score below the threshold despite the allowlist_bonus. The specific traffic feature 'state=FIN' confused the models, as it is often correlated with fuzzing attacks, leading to a false classification. This represents a known model hallucination where benign TCP traffic with unusual states is mislabeled as malicious threats.",
+        "corrected_at": "2026-04-30T00:18:26.505586"
+    },
+    {
+        "event_id": 88112,
+        "context": {
+            "event_id": 88112,
+            "timestamp": "2026-04-30T00:18:26.513707",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.06,
+                "fused_risk": 0.819
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.511158,
+                "spkts": 10.0,
+                "dpkts": 6.0,
+                "sbytes": 2516.0,
+                "dbytes": 268.0,
+                "rate": 29.345135,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 35448.92188,
+                "dload": 3505.765381,
+                "sloss": 2.0,
+                "dloss": 1.0,
+                "sinpkt": 55.136111,
+                "dinpkt": 81.515797,
+                "sjit": 2807.416837,
+                "djit": 124.36225,
+                "swin": 255.0,
+                "stcpb": 3114739265.0,
+                "dtcpb": 1570185020.0,
+                "dwin": 255.0,
+                "tcprtt": 0.186399,
+                "synack": 0.103571,
+                "ackdat": 0.082828,
+                "smean": 252.0,
+                "dmean": 45.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 7.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 3.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 3.0,
+                "ct_srv_dst": 3.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Predicted threat classification is 'Fuzzers', not 'Normal' or 'DoS', triggering default NETWORK_ISOLATION rule.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.1543,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.24569999999999997,
+                        "reason": "fused_risk=0.8190 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T00:18:26.513707"
+            }
+        },
+        "new_rule": null,
+        "analysis": "The fused_risk score was artificially inflated due to the misclassification of normal TCP traffic as 'Fuzzers', where the FIN state was incorrectly flagged as a threat indicator.  \nThe threat classification penalty and quarantine history delta from the 'tcp_-_FIN' signature in active quarantines artificially lowered the trust score below the threshold.  \nThis triggered the default NETWORK_ISOLATION policy, despite the benign nature of the traffic.",
+        "corrected_at": "2026-04-30T00:19:54.806116"
+    },
+    {
+        "event_id": 107004,
+        "context": {
+            "event_id": 107004,
+            "timestamp": "2026-04-30T00:31:18.531169",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.012,
+                "fused_risk": 0.813
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.642795,
+                "spkts": 10.0,
+                "dpkts": 6.0,
+                "sbytes": 534.0,
+                "dbytes": 268.0,
+                "rate": 23.335588,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 5986.356445,
+                "dload": 2787.824951,
+                "sloss": 2.0,
+                "dloss": 1.0,
+                "sinpkt": 71.421667,
+                "dinpkt": 101.990797,
+                "sjit": 3711.269505,
+                "djit": 177.288,
+                "swin": 255.0,
+                "stcpb": 3002194200.0,
+                "dtcpb": 3038802795.0,
+                "dwin": 255.0,
+                "tcprtt": 0.162378,
+                "synack": 0.093962,
+                "ackdat": 0.068416,
+                "smean": 53.0,
+                "dmean": 45.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 4.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 1.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 2.0,
+                "ct_srv_dst": 1.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Predicted threat classification is 'Fuzzers', which is neither 'Normal' nor 'DoS', triggering Rule 6 for NETWORK_ISOLATION. Fused_risk of 0.813 does not meet higher risk thresholds.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.1561,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.24389999999999998,
+                        "reason": "fused_risk=0.8130 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T00:31:18.531169"
+            }
+        },
+        "new_rule": null,
+        "analysis": "The fused_risk signal was artificially elevated due to its weighted fusion, amplifying minor anomalies from other low-risk signals.  \nThe traffic's TCP FIN state was misclassified as 'Fuzzers' by the ML model, likely due to over-sensitivity to this state in threat detection.  \nPolicy penalties, including the threat classification delta and quarantine history, further reduced trust, triggering unnecessary escalation.",
+        "corrected_at": "2026-04-30T00:32:42.215946"
+    },
+    {
+        "event_id": 64979,
+        "context": {
+            "event_id": 64979,
+            "timestamp": "2026-04-30T00:32:42.228171",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.021,
+                "fused_risk": 0.814
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.766548,
+                "spkts": 10.0,
+                "dpkts": 8.0,
+                "sbytes": 534.0,
+                "dbytes": 354.0,
+                "rate": 22.177346,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 5019.907715,
+                "dload": 3235.283447,
+                "sloss": 2.0,
+                "dloss": 1.0,
+                "sinpkt": 85.172,
+                "dinpkt": 91.471289,
+                "sjit": 5295.51066,
+                "djit": 132.938266,
+                "swin": 255.0,
+                "stcpb": 1597696364.0,
+                "dtcpb": 3928613695.0,
+                "dwin": 255.0,
+                "tcprtt": 0.152405,
+                "synack": 0.083954,
+                "ackdat": 0.068451,
+                "smean": 53.0,
+                "dmean": 44.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 4.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 4.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 1.0,
+                "ct_srv_dst": 4.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Predicted threat classification 'Fuzzers' does not match 'Normal' or 'DoS', triggering Rule 6. Fused_risk is 0.814, below the isolation threshold, but Rule 6 applies directly.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.1558,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.24419999999999997,
+                        "reason": "fused_risk=0.8140 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T00:32:42.229215"
+            }
+        },
+        "new_rule": null,
+        "analysis": "The fused_risk was artificially inflated by the threat classification penalty for 'Fuzzers', despite low anomaly_risk indicating benign traffic. The model hallucinated by misclassifying normal TCP traffic with FIN state as malicious fuzzing activity, likely due to overfitting on attack patterns. The quarantine history penalty from 'tcp_-_FIN' being in active_quarantines further degraded trust scores, triggering unnecessary escalation.",
+        "corrected_at": "2026-04-30T00:34:19.234842"
+    },
+    {
+        "event_id": 44092,
+        "context": {
+            "event_id": 44092,
+            "timestamp": "2026-04-30T00:35:29.908726",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.01,
+                "fused_risk": 0.813
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 1.660698,
+                "spkts": 12.0,
+                "dpkts": 10.0,
+                "sbytes": 1106.0,
+                "dbytes": 842.0,
+                "rate": 12.645285,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 4884.692871,
+                "dload": 3651.476562,
+                "sloss": 3.0,
+                "dloss": 2.0,
+                "sinpkt": 150.883276,
+                "dinpkt": 175.562,
+                "sjit": 8604.929769,
+                "djit": 307.823406,
+                "swin": 255.0,
+                "stcpb": 2242242375.0,
+                "dtcpb": 1711429357.0,
+                "dwin": 255.0,
+                "tcprtt": 0.221354,
+                "synack": 0.080631,
+                "ackdat": 0.140723,
+                "smean": 92.0,
+                "dmean": 84.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 2.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 1.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 1.0,
+                "ct_srv_dst": 1.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Predicted threat classification is 'Fuzzers', not 'Normal' or 'DoS'. Fused risk score of 0.813 is below 0.9000, triggering Rule 6 for network isolation.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.1561,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.24389999999999998,
+                        "reason": "fused_risk=0.8130 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T00:35:29.908726"
+            }
+        },
+        "new_rule": null,
+        "analysis": "Unable to generate analysis: LLM unavailable. Autonomous fallback triggered.",
+        "corrected_at": "2026-04-30T00:37:23.336050"
+    },
+    {
+        "event_id": 47657,
+        "context": {
+            "event_id": 47657,
+            "timestamp": "2026-04-30T00:44:34.458640",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.089,
+                "fused_risk": 0.822
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.578908,
+                "spkts": 20.0,
+                "dpkts": 8.0,
+                "sbytes": 17802.0,
+                "dbytes": 354.0,
+                "rate": 46.639533,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 233708.9688,
+                "dload": 4283.927246,
+                "sloss": 7.0,
+                "dloss": 1.0,
+                "sinpkt": 26.085633,
+                "dinpkt": 75.085289,
+                "sjit": 1926.375422,
+                "djit": 106.067758,
+                "swin": 255.0,
+                "stcpb": 4157969508.0,
+                "dtcpb": 1804781536.0,
+                "dwin": 255.0,
+                "tcprtt": 0.140885,
+                "synack": 0.053302,
+                "ackdat": 0.087583,
+                "smean": 890.0,
+                "dmean": 44.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 2.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 2.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 1.0,
+                "ct_srv_dst": 2.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Threat classification is Fuzzers, not Normal or DoS, triggering default isolation policy based on rule 6.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.1534,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.24659999999999999,
+                        "reason": "fused_risk=0.8220 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T00:44:34.458640"
+            }
+        },
+        "new_rule": null,
+        "analysis": "The fused_risk ML signal was artificially inflated due to the misclassification of benign traffic as 'Fuzzers', which is a known model hallucination for normal TCP FIN packets. This triggered a penalty from the threat classification trust factor, reducing the overall trust score below the isolation threshold. The specific feature 'state=FIN' in the traffic telemetry confused the anomaly detection models, mistaking it for fuzzing activity despite the ground truth being normal.",
+        "corrected_at": "2026-04-30T00:45:58.887396"
+    },
+    {
+        "event_id": 84149,
+        "context": {
+            "event_id": 84149,
+            "timestamp": "2026-04-30T00:49:14.200836",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.103,
+                "fused_risk": 0.824
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.990069,
+                "spkts": 10.0,
+                "dpkts": 6.0,
+                "sbytes": 994.0,
+                "dbytes": 268.0,
+                "rate": 15.15046,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 7231.819336,
+                "dload": 1809.974854,
+                "sloss": 2.0,
+                "dloss": 1.0,
+                "sinpkt": 103.267333,
+                "dinpkt": 169.269797,
+                "sjit": 5693.396528,
+                "djit": 279.731969,
+                "swin": 255.0,
+                "stcpb": 4051459646.0,
+                "dtcpb": 1166852715.0,
+                "dwin": 255.0,
+                "tcprtt": 0.24883,
+                "synack": 0.143712,
+                "ackdat": 0.105118,
+                "smean": 99.0,
+                "dmean": 45.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 5.0,
+                "ct_dst_ltm": 2.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 6.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 1.0,
+                "ct_srv_dst": 8.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Predicted threat classification is 'Fuzzers', which is neither 'Normal' nor 'DoS', triggering NETWORK_ISOLATION under rule 6.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.1528,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.24719999999999998,
+                        "reason": "fused_risk=0.8240 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T00:49:14.200836"
+            }
+        },
+        "new_rule": null,
+        "analysis": "The fused_risk score was artificially elevated due to a misclassification in the categorical_risk model, which incorrectly assigned high probability to threat categories despite normal traffic features.  \nThe threat classification model hallucinated, misclassifying the benign TCP traffic with a 'FIN' state as 'Fuzzers' due to overfitting on fuzzing attack patterns.  \nPolicy penalties from the ml_fused_risk and threat_classification deltas further reduced trust below the threshold, triggering unnecessary isolation.",
+        "corrected_at": "2026-04-30T00:50:54.959580"
+    },
+    {
+        "event_id": 74562,
+        "context": {
+            "event_id": 74562,
+            "timestamp": "2026-04-30T00:53:39.058918",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.972,
+                "fused_risk": 0.903
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 39.343376,
+                "spkts": 20.0,
+                "dpkts": 12.0,
+                "sbytes": 1232.0,
+                "dbytes": 536.0,
+                "rate": 0.787934,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 238.108704,
+                "dload": 100.042252,
+                "sloss": 4.0,
+                "dloss": 1.0,
+                "sinpkt": 2070.647474,
+                "dinpkt": 3571.9935,
+                "sjit": 279871.9593,
+                "djit": 11088.492,
+                "swin": 255.0,
+                "stcpb": 3092125290.0,
+                "dtcpb": 533304914.0,
+                "dwin": 255.0,
+                "tcprtt": 0.093048,
+                "synack": 0.051426,
+                "ackdat": 0.041622,
+                "smean": 62.0,
+                "dmean": 45.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 13.0,
+                "ct_dst_ltm": 4.0,
+                "ct_src_dport_ltm": 3.0,
+                "ct_dst_sport_ltm": 3.0,
+                "ct_dst_src_ltm": 13.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 4.0,
+                "ct_srv_dst": 13.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Fused risk score of 0.903 exceeds 0.9000 threshold, triggering NETWORK_ISOLATION. Predicted threat 'Fuzzers' indicates a potential attack.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.1291,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.2709,
+                        "reason": "fused_risk=0.9030 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T00:53:39.058918"
+            }
+        },
+        "new_rule": null,
+        "analysis": "The anomaly_risk was artificially elevated to 0.972 due to the TCP packet state \"FIN\", which is commonly misinterpreted as an attack indicator, such as in fuzzing activities. This high anomaly score contributed to the fused_risk exceeding the 0.9000 threshold, despite the benign traffic. The threat classification penalty for 'Fuzzers' and the quarantine history delta for 'tcp_-_FIN' further degraded trust, leading to false isolation.",
+        "corrected_at": "2026-04-30T00:55:15.502928"
+    },
+    {
+        "event_id": 74562,
+        "context": {
+            "event_id": 74562,
+            "timestamp": "2026-04-30T01:03:18.581174",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.972,
+                "fused_risk": 0.903
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 39.343376,
+                "spkts": 20.0,
+                "dpkts": 12.0,
+                "sbytes": 1232.0,
+                "dbytes": 536.0,
+                "rate": 0.787934,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 238.108704,
+                "dload": 100.042252,
+                "sloss": 4.0,
+                "dloss": 1.0,
+                "sinpkt": 2070.647474,
+                "dinpkt": 3571.9935,
+                "sjit": 279871.9593,
+                "djit": 11088.492,
+                "swin": 255.0,
+                "stcpb": 3092125290.0,
+                "dtcpb": 533304914.0,
+                "dwin": 255.0,
+                "tcprtt": 0.093048,
+                "synack": 0.051426,
+                "ackdat": 0.041622,
+                "smean": 62.0,
+                "dmean": 45.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 13.0,
+                "ct_dst_ltm": 4.0,
+                "ct_src_dport_ltm": 3.0,
+                "ct_dst_sport_ltm": 3.0,
+                "ct_dst_src_ltm": 13.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 4.0,
+                "ct_srv_dst": 13.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Fused risk score of 0.903 exceeds the 0.9000 threshold, triggering NETWORK_ISOLATION. Threat classification 'Fuzzers' indicates potential malicious activity.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.1291,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.2709,
+                        "reason": "fused_risk=0.9030 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T01:03:18.581174"
+            }
+        },
+        "new_rule": {
+            "id": "LEARNED_001",
+            "condition": "IF proto == 'tcp' AND state == 'FIN'",
+            "playbook": "ALLOW",
+            "is_fp": true,
+            "rationale": "This rule allows benign TCP traffic with a FIN state, which was misclassified as fuzzing activity, thereby preventing the high fused_risk score from incorrectly flagging normal traffic.",
+            "created_at": "2026-04-30T01:04:55.330667",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "The anomaly_risk was artificially high due to the TCP traffic with a FIN state, which mimics malicious fuzzing scans.  \nThe fused_risk score exceeded the threshold because it incorporated this high anomaly_risk, amplified by the threat classification penalty for 'Fuzzers'.  \nThis False Positive resulted from a model hallucination where benign traffic was misclassified as fuzzing activity, driven by the specific feature of the FIN state.  \nTrust factors were penalized, including the ml_fused_risk delta, but the root cause was the erroneous detection of normal traffic as malicious.",
+        "corrected_at": "2026-04-30T01:04:55.331971"
+    },
+    {
+        "event_id": 61394,
+        "context": {
+            "event_id": 61394,
+            "timestamp": "2026-04-30T01:12:58.197298",
+            "ml_risk_profile": {
+                "categorical_risk": 0.461,
+                "anomaly_risk": 0.051,
+                "fused_risk": 0.818
+            },
+            "predicted_threat_classification": "Fuzzers",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.613861,
+                "spkts": 12.0,
+                "dpkts": 8.0,
+                "sbytes": 1036.0,
+                "dbytes": 766.0,
+                "rate": 30.951631,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 12380.65234,
+                "dload": 8744.650391,
+                "sloss": 3.0,
+                "dloss": 2.0,
+                "sinpkt": 54.188364,
+                "dinpkt": 79.217141,
+                "sjit": 2966.563337,
+                "djit": 129.913367,
+                "swin": 255.0,
+                "stcpb": 1172850344.0,
+                "dtcpb": 2223748938.0,
+                "dwin": 255.0,
+                "tcprtt": 0.076925,
+                "synack": 0.059332,
+                "ackdat": 0.017593,
+                "smean": 86.0,
+                "dmean": 96.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 3.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 2.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 2.0,
+                "ct_srv_dst": 2.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Standard TCP FIN teardown with low packet counts (spkts=12.0, dpkts=8.0). ML misclassification as 'Fuzzers' confirms a false positive.",
+            "playbook": "ALLOW",
+            "is_false_positive": true,
+            "trust_eval": {
+                "trust_score": 0.1546,
+                "behavior_signature": "tcp_-_FIN",
+                "threat_type": "Fuzzers",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.24539999999999998,
+                        "reason": "fused_risk=0.8180 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T01:12:58.197298"
+            }
+        },
+        "new_rule": {
+            "id": "FN_PATCH_002",
+            "condition": "IF proto == \"tcp\" AND state == \"FIN\" AND threat_class == \"Fuzzers\"",
+            "playbook": "NETWORK_ISOLATION",
+            "is_fn": true,
+            "rationale": "This rule detects Fuzzer attacks with a TCP FIN state, which was the missed pattern, by classifying them as NETWORK_ISOLATION to prevent similar False Negatives.",
+            "created_at": "2026-04-30T01:14:59.164222",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "Unable to generate FN analysis: LLM unavailable. Autonomous fallback triggered.",
+        "corrected_at": "2026-04-30T01:14:59.164817"
+    }
+]
