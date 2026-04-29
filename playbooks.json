@@ -1,4 +1,13 @@
 {
+    "routing_rules": [
+        "1. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Playbook is 'ALLOW' (is_false_positive: true).",
+        "2. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' != 'Normal': Playbook is 'ALLOW' (is_false_positive: false).",
+        "3. IF 'predicted_threat_classification' == 'DoS': Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).",
+        "4. IF 'predicted_threat_classification' == 'Shellcode' AND 'network_telemetry' shows 'proto' as 'udp' AND 'dpkts' is 0: Playbook is 'ALLOW' (is_false_positive: true).",
+        "5. IF 'fused_risk' > {isolation_trigger}: Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).",
+        "6. IF 'predicted_threat_classification' != 'Normal' AND 'predicted_threat_classification' != 'DoS': Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).",
+        "7. IF 'fused_risk' > {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Inspect telemetry. If standard benign traffic, 'ALLOW'. Otherwise, 'STEP_UP_AUTH'."
+    ],
     "ALLOW": {
         "description": "Standard benign traffic or AI-verified False Positive.",
         "steps": [

@@ -249,19 +249,28 @@ class ZeroTrustSOARAgent:
         # default 0.40), NOT the ML optimal_threshold.  The trust score starts at
         # 1.0 and is penalised by multiple independent policy signals — mapping the
         # ML binary threshold onto this scale causes near-universal failure.
-        if self.policy_agent.is_trust_acceptable(trust_eval, threshold=self.trust_threshold):
-            print(f"[ZeroTrust]  Trust ACCEPTABLE (≥ {self.trust_threshold}) → ALLOW fast-path")
+        is_trust_ok = self.policy_agent.is_trust_acceptable(trust_eval, threshold=self.trust_threshold)
+        
+        # GREY ZONE GUARDRAIL: Never fast-path if the ML is highly confident it is an attack
+        grey_zone_limit = 0.85 
+        is_below_grey_zone = fused_score < grey_zone_limit
+
+        if is_trust_ok and is_below_grey_zone:
+            print(f"[ZeroTrust]  Trust ACCEPTABLE (≥ {self.trust_threshold}) AND Risk < 0.85 → ALLOW fast-path")
             decision = {
                 "reasoning": (
                     f"Trust score {trust_eval.trust_score:.4f} meets threshold "
                     f"{self.trust_threshold}. No escalation required." 
                 ),
                 "playbook": "ALLOW",
-                "is_false_positive": True,   # FIX: Acknowledge that the ML Gate made a mistake
+                "is_false_positive": True,   
                 "trust_eval": trust_eval.to_dict()
             }
         else:
-            print(f"[ZeroTrust]  Trust UNACCEPTABLE (< {self.trust_threshold}) → Response Agent")
+            if is_trust_ok and not is_below_grey_zone:
+                print(f"[ZeroTrust]  Trust ACCEPTABLE but Risk {fused_score:.4f} ≥ 0.85 → Vetoing fast-path, escalating to Response Agent")
+            else:
+                print(f"[ZeroTrust]  Trust UNACCEPTABLE (< {self.trust_threshold}) → Response Agent")
 
             # ── Stage 4: Response Agent (LLM) ─────────────────────────
             decision = self.evaluate_incident(context, threshold)
@@ -326,6 +335,15 @@ class ZeroTrustSOARAgent:
 
     def _get_default_playbooks(self):
         return {
+            "routing_rules": [
+                "1. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Playbook is 'ALLOW' (is_false_positive: true).",
+                "2. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' != 'Normal': Playbook is 'ALLOW' (is_false_positive: false).",
+                "3. IF 'predicted_threat_classification' == 'DoS': Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).",
+                "4. IF 'predicted_threat_classification' == 'Shellcode' AND 'network_telemetry' shows 'proto' as 'udp' AND 'dpkts' is 0: Playbook is 'ALLOW' (is_false_positive: true).",
+                "5. IF 'fused_risk' > {isolation_trigger}: Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).",
+                "6. IF 'predicted_threat_classification' != 'Normal' AND 'predicted_threat_classification' != 'DoS': Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).",
+                "7. IF 'fused_risk' > {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Inspect telemetry. If standard benign traffic, 'ALLOW'. Otherwise, 'STEP_UP_AUTH'."
+            ],
             "ALLOW": {
                 "description": "Standard benign traffic or AI-verified False Positive.",
                 "steps": [
@@ -442,32 +460,29 @@ class ZeroTrustSOARAgent:
         # class is explicitly non-Normal/non-DoS.
         isolation_trigger = min(optimal_threshold + 0.15, 0.90)
 
+        raw_rules = self.playbooks.get("routing_rules", [])
+        
+        # Inject the dynamic thresholds into the strings
+        formatted_rules = []
+        for rule in raw_rules:
+            # Handle AI-learned rules (Dictionaries) vs Native rules (Strings)
+            if isinstance(rule, dict):
+                rule_str = f"{rule.get('id')}: {rule.get('condition')} Playbook is '{rule.get('playbook')}' (is_false_positive: {str(rule.get('is_fp', True)).lower()})."
+            else:
+                rule_str = rule
+                
+            formatted_rule = rule_str.replace("{mfa_trigger}", f"{mfa_trigger:.4f}")
+            formatted_rule = formatted_rule.replace("{isolation_trigger}", f"{isolation_trigger:.4f}")
+            formatted_rules.append(formatted_rule)
+            
+        rules_text = "\n        ".join(formatted_rules)
+
         system_prompt = f"""
         You are an AI SOC Analyst evaluating network telemetry and ML risk scores.
         Your goal is to enforce Zero Trust while preventing alert fatigue.
 
-        CRITICAL DIRECTIVE: DO NOT blindly trust the ML 'predicted_threat_classification'. 
-        ML models often misclassify benign background noise or connection teardowns as attacks 
-        (e.g., calling a 4-packet TCP FIN a 'Fuzzer'). You must cross-examine the ML prediction 
-        against the raw packet counts, protocols, and states in the telemetry.
-
         EVALUATION RULES (apply in order, first match wins):
-        1. IF 'fused_risk' <= {mfa_trigger:.4f} AND 'predicted_threat_classification' == "Normal":
-           Playbook is 'ALLOW' (is_false_positive: true).
-        2. IF 'fused_risk' <= {mfa_trigger:.4f} AND 'predicted_threat_classification' != "Normal":
-           Playbook is 'ALLOW' (is_false_positive: false).
-        3. IF 'predicted_threat_classification' == "DoS":
-           Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).
-        4. IF 'fused_risk' > {isolation_trigger:.4f}:
-           Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).
-        5. IF 'predicted_threat_classification' != "Normal" AND 'predicted_threat_classification' != "DoS":
-           Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).
-        6. IF 'fused_risk' > {mfa_trigger:.4f} AND 'predicted_threat_classification' == "Normal":
-           Inspect 'network_telemetry'. If traffic is standard and benign
-           (service is http/ftp/dns AND state is a clean close like FIN/CLO):
-             Playbook is 'ALLOW' (is_false_positive: true).
-           Otherwise:
-             Playbook is 'STEP_UP_AUTH' (is_false_positive: false).
+        {rules_text}
 
         --- TRAINING EXAMPLES (FEW-SHOT) ---
 

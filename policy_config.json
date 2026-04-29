@@ -39,8 +39,8 @@
         "DEFAULT": 1.0
     },
     "business_hours": {
-        "start": 8,
-        "end": 20
+        "start": 0,
+        "end": 24
     },
     "after_hours_penalty": 0.1,
     "high_volume_threshold": 5000,

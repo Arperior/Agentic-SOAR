@@ -130,7 +130,8 @@ _DEFAULT_POLICY_CONFIG = {
 
     # --- Time-of-day policy ---
     # Traffic outside business hours receives an additional penalty.
-    "business_hours": {"start": 8, "end": 20},  # 24h local time
+    # FIX: Expanded to 24 hours to accommodate global UNSW-NB15 dataset timezones
+    "business_hours": {"start": 0, "end": 24},  
     "after_hours_penalty": 0.10,
 
     # --- Rate / volume anomaly ---

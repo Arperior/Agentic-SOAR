@@ -1,162 +1,45 @@
 {
     "dynamic_allowlist": [
-        "tcp_ftp_FIN",
-        "tcp_-_FIN",
-        "tcp_ftp-data_FIN",
-        "tcp_http_FIN"
+        "tcp_-_FIN"
     ],
     "active_quarantines": [
-        "iso-ip_-_INT",
-        "tcp_ftp_FIN",
         "tcp_smtp_FIN",
-        "encap_-_INT",
-        "sprite-rpc_-_INT",
-        "udp_-_INT",
-        "vmtp_-_INT",
-        "unas_-_INT",
-        "ib_-_INT",
         "udp_dns_INT",
-        "ospf_-_REQ",
-        "tcp_http_FIN"
+        "tcp_-_FIN",
+        "vmtp_-_INT",
+        "tcp_ftp_FIN"
     ],
     "trust_scores": {
-        "tcp_-_FIN": {
-            "latest": 0.5785,
-            "previous": 0.6052,
-            "evaluated_at": "2026-04-29T02:55:53.004598",
-            "violations": [
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
         "tcp_ftp_FIN": {
-            "latest": 0.0,
-            "previous": 0.0,
-            "evaluated_at": "2026-04-29T02:31:55.124999",
-            "violations": [
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
-        "tcp_ftp_CON": {
-            "latest": 0.6453,
-            "previous": null,
-            "evaluated_at": "2026-04-29T01:45:42.876226",
-            "violations": [
-                "AFTER_HOURS_ACCESS: event at 01:xx local time"
-            ]
-        },
-        "arp_-_CON": {
-            "latest": 0.7853,
-            "previous": 0.7874,
-            "evaluated_at": "2026-04-29T01:45:42.897494",
-            "violations": [
-                "UNAPPROVED_COMBO: arp_-",
-                "AFTER_HOURS_ACCESS: event at 01:xx local time"
-            ]
-        },
-        "tcp_http_FIN": {
-            "latest": 0.0,
-            "previous": 0.0,
-            "evaluated_at": "2026-04-29T02:50:24.143837",
-            "violations": [
-                "HIGH_SEVERITY_THREAT: Worms exceeds critical threshold",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
-        "tcp_ftp-data_FIN": {
-            "latest": 0.7886,
-            "previous": 0.7898,
-            "evaluated_at": "2026-04-29T02:16:45.646869",
-            "violations": [
-                "UNAPPROVED_COMBO: tcp_ftp-data",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
+            "latest": 0.0108,
+            "previous": 0.0108,
+            "evaluated_at": "2026-04-29T23:07:57.555567",
+            "violations": []
         },
         "udp_dns_INT": {
-            "latest": 0.0,
-            "previous": 0.0,
-            "evaluated_at": "2026-04-29T02:54:04.899958",
-            "violations": [
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
+            "latest": 0.0009,
+            "previous": 0.0006,
+            "evaluated_at": "2026-04-29T23:10:14.570492",
+            "violations": []
         },
-        "ospf_-_REQ": {
-            "latest": 0.0,
-            "previous": 0.2503,
-            "evaluated_at": "2026-04-29T02:55:19.102271",
-            "violations": [
-                "UNAPPROVED_COMBO: ospf_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
+        "tcp_-_FIN": {
+            "latest": 0.1531,
+            "previous": 0.1561,
+            "evaluated_at": "2026-04-29T23:11:26.921345",
+            "violations": []
         },
         "tcp_smtp_FIN": {
-            "latest": 0.0,
-            "previous": 0.2009,
-            "evaluated_at": "2026-04-29T02:52:15.722302",
-            "violations": [
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
+            "latest": 0.3009,
+            "previous": null,
+            "evaluated_at": "2026-04-29T22:32:31.162414",
+            "violations": []
         },
         "vmtp_-_INT": {
-            "latest": 0.2503,
+            "latest": 0.3503,
             "previous": null,
-            "evaluated_at": "2026-04-29T02:32:23.699947",
+            "evaluated_at": "2026-04-29T22:34:08.930774",
             "violations": [
-                "UNAPPROVED_COMBO: vmtp_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
-        "udp_-_INT": {
-            "latest": 0.0,
-            "previous": 0.0,
-            "evaluated_at": "2026-04-29T02:54:38.859950",
-            "violations": [
-                "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
-        "unas_-_INT": {
-            "latest": 0.0,
-            "previous": 0.0,
-            "evaluated_at": "2026-04-29T02:51:36.430998",
-            "violations": [
-                "UNAPPROVED_COMBO: unas_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
-        "encap_-_INT": {
-            "latest": 0.2506,
-            "previous": null,
-            "evaluated_at": "2026-04-29T02:41:28.176624",
-            "violations": [
-                "UNAPPROVED_COMBO: encap_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
-        "sprite-rpc_-_INT": {
-            "latest": 0.2506,
-            "previous": null,
-            "evaluated_at": "2026-04-29T02:48:13.634084",
-            "violations": [
-                "UNAPPROVED_COMBO: sprite-rpc_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
-        "ib_-_INT": {
-            "latest": 0.2506,
-            "previous": null,
-            "evaluated_at": "2026-04-29T02:49:00.136639",
-            "violations": [
-                "UNAPPROVED_COMBO: ib_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
-            ]
-        },
-        "iso-ip_-_INT": {
-            "latest": 0.2506,
-            "previous": null,
-            "evaluated_at": "2026-04-29T02:55:53.005604",
-            "violations": [
-                "UNAPPROVED_COMBO: iso-ip_-",
-                "AFTER_HOURS_ACCESS: event at 02:xx local time"
+                "UNAPPROVED_COMBO: vmtp_-"
             ]
         }
     }
