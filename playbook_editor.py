@@ -18,6 +18,28 @@ During training/evaluation, if the SOAR engine makes a mistake
   [dynamic_allowlist updated in agent memory]
       ↓
   [Future events matching this pattern → ALLOW fast-path]
+
+Additional capabilities
+-----------------------
+Rule health tracking (NEW):
+  Every FN correction now extracts the rule cited in the LLM's reasoning
+  and records it in rule_health.json. Rules that cause FN_THRESHOLD (default 2)
+  false negatives are flagged. Call review_flagged_rules() at the end of an
+  evaluation run to see which rules need human attention.
+
+  Key methods:
+    record_rule_implicated_in_fn(rule_id, event_id, reasoning)
+    review_flagged_rules()
+    _extract_implicated_rule(text) -> Optional[str]
+
+Rule consolidation (from previous fix pass):
+  Call consolidate_rules() every N events to merge near-duplicate learned
+  rules into broader generalisations and prevent rule bloat.
+
+Fuzzy dedup on insert (from previous fix pass):
+  _append_rule_to_playbooks uses _conditions_overlap() to detect when a
+  new rule is a narrower or broader version of an existing rule, rather
+  than relying on exact-string matching alone.
 """
 
 import json
@@ -105,6 +127,12 @@ class PlaybookEditorAgent:
 
         self.correction_log: list[dict] = self._load_correction_log()
 
+        # Rule health tracking — records how many FNs and FPs each rule
+        # (native or learned) has been implicated in. Rules that exceed
+        # FN_THRESHOLD are flagged for human review.
+        self.rule_health_file = "rule_health.json"
+        self.rule_health: dict = self._load_rule_health()
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -156,6 +184,15 @@ class PlaybookEditorAgent:
         # Step 2: Diagnose
         analysis = self._analyse_fn_mistake(context, decision)
         print(f"\n[PlaybookEditorAgent] FN Root-cause analysis:\n  {analysis}")
+
+        # Step 2b: Attribute the FN to whichever rule the LLM cited in its reasoning.
+        # This feeds the rule health tracker so persistently bad rules surface for review.
+        implicated = self._extract_implicated_rule(
+            (decision.get("reasoning") or "") + " " + analysis
+        )
+        if implicated:
+            print(f"[PlaybookEditorAgent] Rule implicated in FN: '{implicated}'")
+            self.record_rule_implicated_in_fn(implicated, event_id, decision.get("reasoning", ""))
 
         # Step 3: Only synthesise if LLM produced a real analysis
         if "LLM unavailable" in analysis:
@@ -285,6 +322,129 @@ class PlaybookEditorAgent:
         print(f"{'='*60}\n")
 
         return record
+
+    # ------------------------------------------------------------------
+    # Rule health tracking — public API
+    # ------------------------------------------------------------------
+
+    def record_rule_implicated_in_fn(self, rule_id: str, event_id, reasoning: str):
+        """
+        Increments the FN counter for rule_id and flags the rule for human
+        review once it crosses FN_THRESHOLD. Call after every confirmed FN
+        where the root-cause analysis names a specific rule.
+
+        FN_THRESHOLD is intentionally low (2) so problems surface quickly
+        during a 50-event evaluation run. Raise it for production use.
+        """
+        FN_THRESHOLD = 2
+
+        if rule_id not in self.rule_health:
+            self.rule_health[rule_id] = {
+                "fn_count": 0, "fp_count": 0,
+                "flagged": False, "incidents": []
+            }
+
+        self.rule_health[rule_id]["fn_count"] += 1
+        self.rule_health[rule_id]["incidents"].append({
+            "type": "FN",
+            "event_id": event_id,
+            "reasoning_snippet": reasoning[:120],
+            "recorded_at": datetime.datetime.now().isoformat()
+        })
+
+        fn_count = self.rule_health[rule_id]["fn_count"]
+        if fn_count >= FN_THRESHOLD and not self.rule_health[rule_id]["flagged"]:
+            self.rule_health[rule_id]["flagged"] = True
+            print(f"\n[PlaybookEditorAgent] ⚠ RULE HEALTH ALERT: Rule '{rule_id}' has caused "
+                  f"{fn_count} false negatives — flagged for human review.")
+            print(f"  → Run review_flagged_rules() or check rule_health.json for full history.")
+
+        self._save_rule_health()
+
+    def review_flagged_rules(self):
+        """
+        Prints a summary of all rules flagged due to repeated FNs.
+        Call at the end of an evaluation run.
+
+        For native rules (NATIVE_RULE_N): prints the rule text so a human
+        can decide whether to tighten, narrow, or remove it from
+        _get_default_playbooks() in soar_zta.py.
+
+        For learned rules (LEARNED_NNN / FN_PATCH_NNN): prints the condition
+        and playbook so it can be edited in playbooks.json or removed and
+        re-synthesised by the next FN correction cycle.
+        """
+        flagged = {
+            rid: data for rid, data in self.rule_health.items()
+            if data.get("flagged")
+        }
+
+        if not flagged:
+            print("[PlaybookEditorAgent] Rule health: all rules within acceptable FN tolerance.")
+            return
+
+        routing_rules = self.soar_agent.playbooks.get("routing_rules", [])
+
+        print(f"\n{'='*60}")
+        print(f"[PlaybookEditorAgent] RULE HEALTH REPORT — {len(flagged)} rule(s) flagged for review")
+
+        for rule_id, data in flagged.items():
+            print(f"\n  ── Rule: {rule_id}")
+            print(f"     FN count : {data['fn_count']}  |  FP count: {data['fp_count']}")
+
+            # Locate and print the rule definition
+            if rule_id.startswith("NATIVE_RULE_"):
+                idx = int(rule_id.split("_")[-1]) - 1
+                native_rules = [r for r in routing_rules if isinstance(r, str)]
+                if 0 <= idx < len(native_rules):
+                    print(f"     Definition : {native_rules[idx][:140]}")
+                    print(f"     Action     : Edit _get_default_playbooks() in soar_zta.py — "
+                          f"tighten condition or remove rule.")
+            else:
+                matched = next(
+                    (r for r in routing_rules
+                     if isinstance(r, dict) and r.get("id") == rule_id),
+                    None
+                )
+                if matched:
+                    print(f"     Condition  : {matched.get('condition')}")
+                    print(f"     Playbook   : {matched.get('playbook')}")
+                    print(f"     Rationale  : {matched.get('rationale', 'n/a')}")
+                    print(f"     Action     : Edit or delete from playbooks.json, "
+                          f"then call consolidate_rules().")
+                else:
+                    print(f"     Definition : <rule no longer in playbooks.json — already replaced or compacted>")
+
+            print(f"     Recent incidents:")
+            for inc in data["incidents"][-3:]:
+                print(f"       [{inc['type']}] Event {inc['event_id']}: {inc['reasoning_snippet'][:100]}")
+
+        print(f"\n  Native rules require manual edits. Learned rules can be removed from")
+        print(f"  playbooks.json — the next FN correction cycle will re-synthesise a better one.")
+        print(f"{'='*60}\n")
+
+    @staticmethod
+    def _extract_implicated_rule(text: str) -> Optional[str]:
+        """
+        Parses LLM reasoning / analysis text to find a rule reference.
+
+        Matches:
+          - Learned / patch rule IDs:  LEARNED_003, FN_PATCH_002
+          - Native rule references:    "rule 4", "Rule 4", "rule #4"
+
+        Returns a canonical rule ID string, or None if nothing is found.
+        """
+        # Learned / patch rule IDs take priority (they're unambiguous)
+        match = re.search(r"\b(LEARNED_\d+|FN_PATCH_\d+)\b", text, re.IGNORECASE)
+        if match:
+            return match.group(1).upper()
+
+        # Native rule references like "rule 4", "Rule 4", "rule #4"
+        match = re.search(r"\brule\s+#?(\d+)\b", text, re.IGNORECASE)
+        if match:
+            return f"NATIVE_RULE_{match.group(1)}"
+
+        return None
 
     # ------------------------------------------------------------------
     # LLM helpers
@@ -536,6 +696,10 @@ RULES:
             "stream":  False,
             "options": {
                 "temperature": 0.1,
+                # FIX (LLM timeout): Honour the caller-supplied max_tokens as a
+                # hard cap on token generation. Analysis calls pass 1500, rule
+                # synthesis passes 3000 — both well above what the output needs
+                # but low enough to prevent runaway <think> chains from timing out.
                 "num_predict": max_tokens
             }
         }
@@ -555,6 +719,108 @@ RULES:
     # ------------------------------------------------------------------
     # Playbook I/O
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _conditions_overlap(cond_a: str, cond_b: str) -> bool:
+        """
+        Returns True if one condition's clauses are a subset of the other's.
+
+        e.g. "proto=udp AND state=INT" overlaps (and is broader than)
+             "proto=udp AND state=INT AND threat_class=Shellcode"
+
+        Used to prevent near-duplicate rule accumulation: if an existing rule
+        already covers the new pattern more broadly, the insert is skipped.
+        If the new rule is broader, the old one is replaced.
+        """
+        def parse_clauses(c: str) -> set:
+            return {clause.strip().lower() for clause in c.split("AND") if clause.strip()}
+
+        a = parse_clauses(cond_a)
+        b = parse_clauses(cond_b)
+        # One is a subset of the other → they cover overlapping traffic
+        return a.issubset(b) or b.issubset(a)
+
+    def consolidate_rules(self):
+        """
+        Asks the LLM to review all learned routing rules and merge near-duplicates
+        into broader, more general rules. Call periodically (e.g. every 10 events)
+        or at the end of an evaluation run to prevent rule bloat.
+
+        FIX (Rule specificity / bloat): The LLM tends to anchor synthesised rules
+        on exact telemetry values (spkts, dpkts) producing hyper-specific rules
+        that cover only a single event. Periodic consolidation merges these into
+        broader pattern rules (e.g. proto=udp AND state=INT AND threat_class=Shellcode)
+        that generalise across the signature class.
+
+        Native string rules (the default routing_rules defined in _get_default_playbooks)
+        are never touched — only PlaybookEditorAgent-sourced dicts are consolidated.
+        """
+        playbooks = self.soar_agent.playbooks
+        learned = [
+            r for r in playbooks.get("routing_rules", [])
+            if isinstance(r, dict) and r.get("source") == "PlaybookEditorAgent"
+        ]
+
+        if len(learned) < 3:
+            return  # Nothing worth consolidating yet
+
+        print(f"\n[PlaybookEditorAgent] Consolidating {len(learned)} learned rules…")
+
+        system_prompt = """
+You are a SOAR playbook auditor reviewing a set of autonomously learned routing rules.
+Your task: identify rules that are redundant, near-duplicate, or overly specific and merge
+them into broader rules that generalise across the pattern class.
+
+MERGE CRITERIA:
+- Two rules whose conditions share the same proto, state, and threat_class (differing only
+  in packet counts or minor telemetry values) should be merged into one rule that drops
+  the overly-specific clauses.
+- Rules that differ in playbook (ALLOW vs NETWORK_ISOLATION) must NEVER be merged.
+- Keep rules that are genuinely distinct (different proto, state, or threat_class).
+
+OUTPUT FORMAT:
+- Return ONLY a raw JSON array of the consolidated rules.
+- Preserve the earliest created_at of any merged group.
+- Set "source" to "PlaybookEditorAgent" on every rule.
+- Normalise condition strings: plain AND-separated key=value pairs, no quotes, no operators.
+- No markdown, no preamble, no explanation — ONLY the JSON array.
+"""
+
+        user_prompt = (
+            f"Learned rules to consolidate:\n{json.dumps(learned, indent=2)}\n\n"
+            f"Return the consolidated JSON array. Merge near-duplicates. Keep distinct rules as-is."
+        )
+
+        raw = self._call_llm(system_prompt, user_prompt, max_tokens=3000)
+        if not raw:
+            print("[PlaybookEditorAgent] Consolidation skipped — LLM unavailable.")
+            return
+
+        try:
+            cleaned = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+            cleaned = re.sub(r"^```json\s*|^```\s*|```\s*$", "", cleaned, flags=re.MULTILINE).strip()
+
+            consolidated = json.loads(cleaned)
+            if not isinstance(consolidated, list):
+                print("[PlaybookEditorAgent] Consolidation parse error — LLM did not return a list. Skipping.")
+                return
+
+            # Normalise all condition strings
+            for r in consolidated:
+                if isinstance(r, dict):
+                    r["condition"] = self._normalise_condition(r.get("condition", ""))
+
+            # Rebuild routing_rules: consolidated learned rules at front, native rules preserved
+            native = [
+                r for r in playbooks["routing_rules"]
+                if not (isinstance(r, dict) and r.get("source") == "PlaybookEditorAgent")
+            ]
+            playbooks["routing_rules"] = consolidated + native
+            self._save_playbooks(playbooks)
+            print(f"[PlaybookEditorAgent] Consolidation complete: {len(learned)} rules → {len(consolidated)} rules.")
+
+        except (json.JSONDecodeError, ValueError) as exc:
+            print(f"[PlaybookEditorAgent] Consolidation parse error: {exc} — existing rules unchanged.")
 
     @staticmethod
     def _normalise_condition(condition: str) -> str:
@@ -579,27 +845,61 @@ RULES:
             playbooks["learned_rule_audit"] = []
 
         routing_rules = playbooks["routing_rules"]
+        new_cond = new_rule.get("condition", "").strip().lower()
+        new_playbook = new_rule.get("playbook", "")
 
-        existing_conditions = set()
+        # FIX (Rule bloat / near-duplicate accumulation):
+        # The original check used exact-string matching only, so rules differing
+        # by a single telemetry clause (e.g. adding spkts=2) were both written.
+        # The new logic:
+        #   1. Exact match → skip (unchanged behaviour).
+        #   2. Overlapping condition AND same playbook direction:
+        #      - If existing rule is broader (fewer clauses) → skip: already covered.
+        #      - If new rule is broader (fewer clauses) → replace old with new rule.
+        #   3. Overlapping condition but DIFFERENT playbook (ALLOW vs NETWORK_ISOLATION)
+        #      → always insert: conflicting rules need both to be visible for review.
+        rule_to_replace = None
         for r in routing_rules:
-            if isinstance(r, dict):
-                existing_conditions.add(r.get("condition", "").strip().lower())
+            if not isinstance(r, dict):
+                continue
+            existing_cond = r.get("condition", "").strip().lower()
+            existing_playbook = r.get("playbook", "")
 
-        if new_rule.get("condition", "").strip().lower() in existing_conditions:
-            print("[PlaybookEditorAgent] Rule with identical condition already exists — skipping insert.")
-            return
+            if existing_cond == new_cond:
+                print(f"[PlaybookEditorAgent] Identical rule '{r.get('id')}' already exists — skipping insert.")
+                return
+
+            if self._conditions_overlap(existing_cond, new_cond) and existing_playbook == new_playbook:
+                existing_clauses = len([c for c in existing_cond.split("AND") if c.strip()])
+                new_clauses      = len([c for c in new_cond.split("AND")      if c.strip()])
+
+                if existing_clauses <= new_clauses:
+                    # Existing rule is equally broad or broader → new rule is redundant
+                    print(f"[PlaybookEditorAgent] Broader rule '{r.get('id')}' already covers this pattern "
+                          f"({existing_clauses} clauses vs {new_clauses}) — skipping insert.")
+                    return
+                else:
+                    # New rule is broader → it supersedes the old one
+                    print(f"[PlaybookEditorAgent] New rule '{new_rule['id']}' is broader than '{r.get('id')}' "
+                          f"({new_clauses} clauses vs {existing_clauses}) — replacing.")
+                    rule_to_replace = r
+                    break
+
+        if rule_to_replace is not None:
+            routing_rules.remove(rule_to_replace)
 
         if len(routing_rules) >= self.MAX_ROUTING_RULES:
             self._compact_rules(playbooks)
 
-        # Insert at the TOP of the routing rules (index 0) so the patch overrides older logic
+        # Insert at the TOP so patch rules override older / more general logic
         routing_rules.insert(0, new_rule)
 
         playbooks["learned_rule_audit"].append({
             "rule_id":      new_rule["id"],
             "event_id":     event_id,
             "trigger":      trigger,
-            "appended_at":  new_rule["created_at"]
+            "appended_at":  new_rule["created_at"],
+            "replaced":     rule_to_replace.get("id") if rule_to_replace else None
         })
 
         self._save_playbooks(playbooks)
@@ -653,6 +953,23 @@ RULES:
         service = telemetry.get("service", "unknown")
         state   = telemetry.get("state",   "unknown")
         return f"{proto}_{service}_{state}"
+
+    # ------------------------------------------------------------------
+    # Rule health I/O
+    # ------------------------------------------------------------------
+
+    def _load_rule_health(self) -> dict:
+        if not os.path.exists(self.rule_health_file):
+            return {}
+        with open(self.rule_health_file, "r") as f:
+            try:
+                return json.load(f)
+            except json.JSONDecodeError:
+                return {}
+
+    def _save_rule_health(self):
+        with open(self.rule_health_file, "w") as f:
+            json.dump(self.rule_health, f, indent=4)
 
     # ------------------------------------------------------------------
     # Correction log I/O

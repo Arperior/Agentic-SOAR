@@ -285,7 +285,24 @@ class ZeroTrustSOARAgent:
                 print(f"[ZeroTrust]  Trust UNACCEPTABLE (< {self.trust_threshold}) → Response Agent")
 
             # ── Stage 4: Response Agent (LLM) ─────────────────────────
-            decision = self.evaluate_incident(context, threshold)
+            # FIX (Quarantine short-circuit): If this signature is already in
+            # active_quarantines, skip the LLM entirely — we already know it's
+            # malicious. This prevents hammering Ollama with repeat events for
+            # the same bad signature (a major source of LLM timeout errors).
+            if trust_eval.behavior_signature in self.active_quarantines:
+                print(f"[ZeroTrust]  Signature '{trust_eval.behavior_signature}' already quarantined "
+                      f"→ NETWORK_ISOLATION (LLM skipped)")
+                decision = {
+                    "reasoning": (
+                        f"Signature '{trust_eval.behavior_signature}' is in active quarantine. "
+                        f"Immediate isolation without LLM re-evaluation."
+                    ),
+                    "playbook": "NETWORK_ISOLATION",
+                    "is_false_positive": False,
+                    "is_llm_failsafe": False
+                }
+            else:
+                decision = self.evaluate_incident(context, threshold)
             decision["trust_eval"] = trust_eval.to_dict()
 
         # ── Stage 5: Execute SOAR Playbook ────────────────────────────
@@ -351,7 +368,7 @@ class ZeroTrustSOARAgent:
                 "1. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Playbook is 'ALLOW' (is_false_positive: true).",
                 "2. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' != 'Normal': Playbook is 'ALLOW' (is_false_positive: false).",
                 "3. IF 'predicted_threat_classification' == 'DoS': Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).",
-                "4. IF 'predicted_threat_classification' == 'Shellcode' AND 'network_telemetry' shows 'proto' as 'udp' AND 'dpkts' is 0: Playbook is 'ALLOW' (is_false_positive: true).",
+                "4. IF 'predicted_threat_classification' == 'Shellcode' AND 'proto' == 'udp' AND 'dpkts' == 0 AND 'fused_risk' < {mfa_trigger}: Playbook is 'ALLOW' (is_false_positive: true). NOTE: This rule applies ONLY to Shellcode misclassifications with low fused risk. Generic, Reconnaissance, or other non-Normal threat classes with dpkts=0 are NOT covered by this rule.",
                 "5. IF 'fused_risk' > {isolation_trigger}: Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).",
                 "6. IF 'predicted_threat_classification' != 'Normal' AND 'predicted_threat_classification' != 'DoS': Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).",
                 "7. IF 'fused_risk' > {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Inspect telemetry. If standard benign traffic, 'ALLOW'. Otherwise, 'STEP_UP_AUTH'."
@@ -557,6 +574,14 @@ class ZeroTrustSOARAgent:
             "stream": False,
             "options": {
                 "temperature": 0.0,
+                # FIX (LLM timeout): Cap token generation so the model cannot
+                # spend minutes producing a long <think> chain before the JSON.
+                # 512 tokens is ample for a 3-field JSON object with 1-2 sentence
+                # reasoning. The <think> strip regex handles any residual CoT.
+                # Also set OLLAMA_KEEP_ALIVE=-1 in your environment so the model
+                # stays loaded between events and avoids the ~60s reload penalty:
+                #   export OLLAMA_KEEP_ALIVE=-1 && ollama serve
+                "num_predict": 512,
             }
         }
 
@@ -680,16 +705,28 @@ class ZeroTrustSOARAgent:
             self._add_to_quarantine(trust_eval)
 
     def _add_to_allowlist(self, trust_eval: TrustEvaluation):
-        """FIX 2: Uses pre-computed signature from TrustEvaluation."""
+        """FIX 2: Uses pre-computed signature from TrustEvaluation.
+        FIX (Mutual exclusivity): Never allowlist a signature that is currently
+        quarantined — quarantine always wins. The PlaybookEditorAgent's
+        _register_quarantine is the only path that can move a sig from quarantine
+        to allowlist, and only after explicit FP confirmation."""
         sig = trust_eval.behavior_signature
+        if sig in self.active_quarantines:
+            print(f"       [MEMORY] '{sig}' is quarantined — allowlist add skipped (quarantine takes precedence).")
+            return
         if sig not in self.dynamic_allowlist:
             print(f"       [MEMORY] Adding '{sig}' to Allowlist")
             self.dynamic_allowlist.add(sig)
             self._save_memory()
 
     def _add_to_quarantine(self, trust_eval: TrustEvaluation):
-        """FIX 2: Uses pre-computed signature from TrustEvaluation."""
+        """FIX 2: Uses pre-computed signature from TrustEvaluation.
+        FIX (Mutual exclusivity): Strips the signature from the dynamic allowlist
+        before adding to quarantine so the two sets are always disjoint."""
         sig = trust_eval.behavior_signature
+        if sig in self.dynamic_allowlist:
+            print(f"       [MEMORY] Removing '{sig}' from Allowlist (confirmed attack — quarantine overrides)")
+            self.dynamic_allowlist.discard(sig)
         if sig not in self.active_quarantines:
             print(f"       [MEMORY] Adding '{sig}' to Quarantine")
             self.active_quarantines.add(sig)

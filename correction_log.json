@@ -1102,5 +1102,208 @@
         "new_rule": null,
         "analysis": "Unable to generate FN analysis: LLM unavailable. Autonomous fallback triggered.",
         "corrected_at": "2026-04-30T02:16:26.465635"
+    },
+    {
+        "event_id": 121072,
+        "context": {
+            "event_id": 121072,
+            "timestamp": "2026-04-30T15:50:04.439524",
+            "ml_risk_profile": {
+                "categorical_risk": 0.456,
+                "anomaly_risk": 0.083,
+                "fused_risk": 0.781
+            },
+            "predicted_threat_classification": "Shellcode",
+            "network_telemetry": {
+                "ct_state_ttl": "2",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "udp",
+                "service": "-",
+                "state": "INT",
+                "dur": 1.1e-05,
+                "spkts": 2.0,
+                "dpkts": 0.0,
+                "sbytes": 168.0,
+                "dbytes": 0.0,
+                "rate": 90909.0902,
+                "sttl": 254.0,
+                "dttl": 0.0,
+                "sload": 61090908.0,
+                "dload": 0.0,
+                "sloss": 0.0,
+                "dloss": 0.0,
+                "sinpkt": 0.011,
+                "dinpkt": 0.0,
+                "sjit": 0.0,
+                "djit": 0.0,
+                "swin": 0.0,
+                "stcpb": 0.0,
+                "dtcpb": 0.0,
+                "dwin": 0.0,
+                "tcprtt": 0.0,
+                "synack": 0.0,
+                "ackdat": 0.0,
+                "smean": 84.0,
+                "dmean": 0.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 5.0,
+                "ct_dst_ltm": 2.0,
+                "ct_src_dport_ltm": 2.0,
+                "ct_dst_sport_ltm": 2.0,
+                "ct_dst_src_ltm": 2.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 3.0,
+                "ct_srv_dst": 2.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Trust score 0.4657 meets threshold 0.4. No escalation required.",
+            "playbook": "ALLOW",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.4657,
+                "behavior_signature": "udp_-_INT",
+                "threat_type": "Shellcode",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.2343,
+                        "reason": "fused_risk=0.7810 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.45,
+                        "reason": "predicted_threat='Shellcode' \u2192 penalty=0.45"
+                    },
+                    {
+                        "name": "allowlist_bonus",
+                        "delta": 0.15,
+                        "reason": "signature 'udp_-_INT' was previously verified as benign (FP)"
+                    }
+                ],
+                "policy_violations": [
+                    "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold"
+                ],
+                "is_acceptable": true,
+                "evaluated_at": "2026-04-30T15:50:04.439524"
+            }
+        },
+        "new_rule": {
+            "id": "FN_PATCH_004",
+            "condition": "proto=udp AND state=INT AND threat_class=Shellcode",
+            "playbook": "NETWORK_ISOLATION",
+            "is_fn": true,
+            "rationale": "To detect Shellcode attacks with UDP and intermediate state to prevent false negatives.",
+            "created_at": "2026-04-30T15:51:18.357648",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "The allowlist bonus incorrectly elevated trust for the signature 'udp_-_INT', which was previously flagged as a false positive, overriding the threat classification penalty and keeping the trust score above the threshold.\n\nThe Shellcode threat classification applied a significant penalty, but the low anomaly_risk (0.083) and UDP protocol features masked the attack, allowing it to bypass detection despite the fused_risk being relatively high.\n\nThe traffic telemetry showed minimal packet activity (spkts=2.0, dpkts=0.0), which disguised the malicious intent, contributing to the low anomaly_risk and enabling the false negative.",
+        "corrected_at": "2026-04-30T15:51:18.363980"
+    },
+    {
+        "event_id": 154565,
+        "context": {
+            "event_id": 154565,
+            "timestamp": "2026-04-30T15:58:02.148099",
+            "ml_risk_profile": {
+                "categorical_risk": 0.999,
+                "anomaly_risk": 0.447,
+                "fused_risk": 0.997
+            },
+            "predicted_threat_classification": "Generic",
+            "network_telemetry": {
+                "ct_state_ttl": "2",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "udp",
+                "service": "dns",
+                "state": "INT",
+                "dur": 8e-06,
+                "spkts": 2.0,
+                "dpkts": 0.0,
+                "sbytes": 114.0,
+                "dbytes": 0.0,
+                "rate": 125000.0003,
+                "sttl": 254.0,
+                "dttl": 0.0,
+                "sload": 57000000.0,
+                "dload": 0.0,
+                "sloss": 0.0,
+                "dloss": 0.0,
+                "sinpkt": 0.008,
+                "dinpkt": 0.0,
+                "sjit": 0.0,
+                "djit": 0.0,
+                "swin": 0.0,
+                "stcpb": 0.0,
+                "dtcpb": 0.0,
+                "dwin": 0.0,
+                "tcprtt": 0.0,
+                "synack": 0.0,
+                "ackdat": 0.0,
+                "smean": 57.0,
+                "dmean": 0.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 16.0,
+                "ct_dst_ltm": 16.0,
+                "ct_src_dport_ltm": 16.0,
+                "ct_dst_sport_ltm": 16.0,
+                "ct_dst_src_ltm": 16.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 16.0,
+                "ct_srv_dst": 16.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "UDP packets with zero response packets detected, indicating unidirectional traffic. ML predicted threat as Generic, not Normal, but rule 4 applies for UDP with dpkts=0.",
+            "playbook": "ALLOW",
+            "is_false_positive": true,
+            "trust_eval": {
+                "trust_score": 0.0009,
+                "behavior_signature": "udp_dns_INT",
+                "threat_type": "Generic",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.2991,
+                        "reason": "fused_risk=0.9970 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.2,
+                        "reason": "predicted_threat='Generic' \u2192 penalty=0.20"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'udp_dns_INT' is in active_quarantines"
+                    },
+                    {
+                        "name": "high_categorical_risk",
+                        "delta": -0.1,
+                        "reason": "categorical_risk=0.9990 > threshold=0.7"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-04-30T15:58:02.148835"
+            }
+        },
+        "new_rule": {
+            "id": "FN_PATCH_005",
+            "condition": "proto=udp AND dpkts=0",
+            "playbook": "NETWORK_ISOLATION",
+            "is_fn": true,
+            "rationale": "Catches UDP traffic with no dropped packets to prevent similar false negatives.",
+            "created_at": "2026-04-30T16:00:30.698882",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "The anomaly_risk was low (0.447), failing to identify the unusual traffic despite high categorical and fused risks.  \nRule 4 explicitly allowed UDP with dpkts=0, bypassing normal threat detection.  \nThe Generic threat classification imposed minimal penalties, contributing to the false negative.",
+        "corrected_at": "2026-04-30T16:00:30.701675"
     }
 ]

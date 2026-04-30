@@ -1,38 +1,40 @@
 {
     "dynamic_allowlist": [
-        "udp_-_INT"
+        "tcp_-_FIN",
+        "udp_dns_INT"
     ],
     "active_quarantines": [
         "iso-ip_-_INT",
-        "ib_-_INT",
-        "encap_-_INT",
-        "unas_-_INT",
-        "vmtp_-_INT",
-        "tcp_smtp_FIN",
-        "sprite-rpc_-_INT",
-        "tcp_http_FIN",
         "ospf_-_REQ",
         "udp_dns_INT",
+        "tcp_http_FIN",
         "tcp_ftp_FIN",
-        "tcp_-_FIN"
+        "encap_-_INT",
+        "vmtp_-_INT",
+        "tcp_smtp_FIN",
+        "udp_-_INT",
+        "tcp_-_FIN",
+        "ib_-_INT",
+        "unas_-_INT",
+        "sprite-rpc_-_INT"
     ],
     "trust_scores": {
         "tcp_ftp_FIN": {
             "latest": 0.0,
-            "previous": 0.4114,
-            "evaluated_at": "2026-04-30T00:15:32.506762",
+            "previous": 0.0,
+            "evaluated_at": "2026-04-30T16:00:55.515865",
             "violations": []
         },
         "udp_dns_INT": {
             "latest": 0.0006,
             "previous": 0.0009,
-            "evaluated_at": "2026-04-30T02:13:28.684405",
+            "evaluated_at": "2026-04-30T16:04:57.596261",
             "violations": []
         },
         "tcp_-_FIN": {
-            "latest": 0.6956,
-            "previous": 0.1285,
-            "evaluated_at": "2026-04-30T02:15:49.418546",
+            "latest": 0.1552,
+            "previous": 0.1456,
+            "evaluated_at": "2026-04-30T16:00:30.709800",
             "violations": []
         },
         "tcp_smtp_FIN": {
@@ -42,9 +44,9 @@
             "violations": []
         },
         "vmtp_-_INT": {
-            "latest": 0.3506,
-            "previous": null,
-            "evaluated_at": "2026-04-30T00:15:56.077767",
+            "latest": 0.0,
+            "previous": 0.3506,
+            "evaluated_at": "2026-04-30T15:56:50.324243",
             "violations": [
                 "UNAPPROVED_COMBO: vmtp_-"
             ]
@@ -52,7 +54,7 @@
         "udp_-_INT": {
             "latest": 0.4657,
             "previous": 0.4657,
-            "evaluated_at": "2026-04-30T02:16:26.468696",
+            "evaluated_at": "2026-04-30T15:50:04.439524",
             "violations": [
                 "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold"
             ]
