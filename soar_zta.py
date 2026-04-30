@@ -423,7 +423,6 @@ class ZeroTrustSOARAgent:
             "options": {
                 "temperature": 0.0,
                 "num_predict": 3072,
-                "stop": ["\n}\n", "}\n\n"]  # ← halt right after the JSON closes
             }
         }
 

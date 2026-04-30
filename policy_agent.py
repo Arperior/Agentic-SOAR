@@ -73,16 +73,16 @@ _DEFAULT_POLICY_CONFIG = {
     # Keys must match attack_cat labels from your dataset.
     "threat_class_penalties": {
         "Normal":          0.00,
-        "Generic":         0.20,
+        "Generic":         0.40,  # Increased from 0.20
         "Exploits":        0.30,
-        "Fuzzers":         0.20,
-        "DoS":             0.15,      # handled by RATE_LIMIT_DOS, lighter penalty here
-        "Reconnaissance":  0.25,
+        "Fuzzers":         0.40,  # Increased from 0.20
+        "DoS":             0.15,  
+        "Reconnaissance":  0.40,  # Increased from 0.25
         "Backdoor":        0.40,
         "Analysis":        0.15,
         "Shellcode":       0.45,
         "Worms":           0.40,
-        "UNKNOWN":         0.30       # fallback for unseen classes
+        "UNKNOWN":         0.40   # Increased from 0.30
     },
 
     # --- Memory-based penalties ---
