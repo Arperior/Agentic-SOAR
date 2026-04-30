@@ -20,8 +20,7 @@ class RCF:
         self.index = 0
         self.warmup = warmup
         self.smoothing_window = smoothing_window
-        # FIX (Issue 2): Use a fixed-length deque so a sustained burst of anomalies
-        # cannot erode detection sensitivity by growing the history buffer unboundedly.
+        # Use a fixed-length deque so a sustained burst of anomalies cannot erode detection sensitivity by growing the history buffer unboundedly
         self.history = deque(maxlen=smoothing_window)
         self._is_fitted = False
         # Percentile anchors for score normalization — set at end of fit_predict.
@@ -44,7 +43,7 @@ class RCF:
     def _score_blind(self, x):
         """Phase 4 & 5: Temporarily inserts to score, then deletes (Zero Leakage)."""
         scores = []
-        # FIX: Generate a unique ID for this specific thread's evaluation
+        # Generate a unique ID for this specific thread's evaluation
         temp_index = f"temp_eval_{uuid.uuid4().hex}" 
         
         for tree in self.forest:
@@ -68,19 +67,7 @@ class RCF:
             normalized = clip((raw - p1) / (p99 - p1), 0, 1)
         This maps the 1st-percentile score to ~0.0 and the 99th to ~1.0,
         preserving the full dynamic range without saturation.
-
-        FIX (Issue 4 — RCF ceiling saturation): The RCF is trained on normal
-        traffic only.  Attack traffic at test time often produces codisp values
-        far above the training p99, so the clip at 1.0 causes many attack rows
-        to saturate at exactly 1.0000 — collapsing the score distribution and
-        making them indistinguishable from each other.  To give the meta-learner
-        more signal above the 99th percentile, the ceiling is relaxed to
-        _score_p99 * 1.5 (a 50% headroom above the highest normal-traffic score
-        seen during training).  This spreads the high-anomaly region from a
-        single cliff edge at 1.0 into a graded ramp, while still capping the
-        very highest outliers to prevent unbounded scores from destabilising the
-        meta-learner's logistic function.
-        Falls back to the sigmoid only during fit_predict before calibration.
+        The RCF is trained on normal traffic only.  
         """
         if self._score_p1 is not None and self._score_p99 is not None:
             # FIX: use p99 * 1.5 as ceiling to reduce attack-score saturation.
@@ -93,23 +80,14 @@ class RCF:
         return float(1.0 / (1.0 + np.exp(-np.log1p(raw_score))))
 
     def _smooth_score(self, score):
-        # FIX (Issue 2): deque(maxlen=N) automatically evicts oldest entry —
+        # FIX: deque(maxlen=N) automatically evicts oldest entry —
         # no manual pop needed, and the window is strictly bounded.
         self.history.append(score)
         return float(np.mean(self.history))
 
-    # --- CORE API METHODS ---
-
     def fit_predict(self, X,global_p1=None, global_p99=None):
         """
         Phase 1 (Training): Builds the baseline forest from normal traffic.
-
-        FIX (Issue 1 — Score Distribution Mismatch):
-        Returns raw, unsmoothed scores so OOF features fed to the meta-learner
-        are generated under IDENTICAL conditions to predict_proba() at inference
-        time. Previously, fit_predict used smoothing and warmup suppression while
-        predict_proba used smooth=False, causing the meta-learner to be trained on
-        a different score distribution than it receives during evaluation.
 
         Warmup suppression (returning 0.0 for the first N points) is also removed:
         injecting artificial zeros into OOF features would skew the meta-learner's
@@ -128,14 +106,7 @@ class RCF:
         # Calibrate percentile anchors on the training distribution before
         # normalizing. This stretches the score range so normal traffic maps
         # near 0 and genuine anomalies map near 1, preventing sigmoid saturation.
-        # FIX (Issue 5 — OOF/test cost gap): Print the anchors so the caller
-        # can compare per-fold anchors (from generate_oof_features) against the
-        # final full-train RCF anchors.  A large divergence means OOF meta-learner
-        # features were generated on a different score scale than what the final
-        # RCF produces at test time, inflating the train→test cost gap.
         raw_array = np.array(raw_scores)
-        # FIX: If global anchors are provided (from the full-train model), use them!
-        # Otherwise, calculate them locally.
         if global_p1 is not None and global_p99 is not None:
             self._score_p1 = global_p1
             self._score_p99 = global_p99
@@ -158,11 +129,6 @@ class RCF:
         Phase 4 (Batch Testing): Scores unseen data blindly.
         smooth=False guarantees order-independent, i.i.d evaluation and matches
         the distribution used during OOF generation in fit_predict().
-
-        FIX (Issue 4): Prints a saturation diagnostic after scoring so the caller
-        can verify that attack scores are not collapsing to 1.0000 en masse.
-        If "% at ceiling" is above ~15%, the effective_ceiling in _normalize_score
-        should be increased (e.g. p99 * 2.0) or the RCF retrained.
         """
         if not self._is_fitted:
             raise RuntimeError("[ERROR] RCF Model must be fitted before predicting.")

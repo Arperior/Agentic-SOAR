@@ -1,5 +1,5 @@
 import numpy as np
-import dill as pickle  # Using dill to match your RCF model serialization
+import dill as pickle  
 import os
 from sklearn.preprocessing import StandardScaler
 
@@ -9,7 +9,7 @@ class CostSensitiveMetaLearner:
     Features: L2 Regularization, Persistent Internal Scaler, Early Stopping,
               Input Validation, and Disk Persistence.
 
-    FIX (Issue 3): Now accepts 3 meta-features:
+    Now accepts 3 meta-features:
       [0] CatBoost binary probability
       [1] RCF anomaly score
       [2] Incident agent uncertainty (entropy over attack-class softmax)
@@ -141,7 +141,7 @@ class CostSensitiveMetaLearner:
 
 def _incident_entropy(incident_proba: np.ndarray) -> np.ndarray:
     """
-    FIX (Issue 3): Reduces the incident agent's N-class softmax output to a
+    Reduces the incident agent's N-class softmax output to a
     single scalar per sample using Shannon entropy.
 
     High entropy  → the agent is uncertain across attack categories → the
@@ -173,10 +173,6 @@ def train_fusion_meta_learner(X_train_meta, y_train, COST_FN=10, COST_FP=2, lamb
         epsilon=1e-5
     )
     meta_model.fit(X_train_meta, y_train)
-    
-    # FIX (Issue 3 — CatBoost marginalisation guard): Print the learned weights
-    # so the caller can verify CatBoost's contribution (index 0) is not being
-    # squeezed out by a higher min_precision threshold.
     # Feature order: [0] CatBoost prob, [1] RCF score, [2] Incident entropy.
     w = meta_model.weights
     print(

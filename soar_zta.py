@@ -1,89 +1,3 @@
-"""
-soar_zta.py — Zero Trust SOAR Agent
-
-Implements the full pipeline from the flowchart:
-
-  INPUT SOURCES (Endpoint / Network / Identity Logs)
-      ↓
-  [Receive Security Event]
-      ↓
-  [Feature Extraction]
-      ↓
-  [RCF Anomaly Detection]
-      ↓
-  Is Anomaly Score > Threshold?
-      │ No  → [Log benign event] → End
-      │ Yes
-      ↓
-  [Incident Agent → Threat Classification → Risk Agent → Calculate Risk Score]
-      ↓
-  [Policy Agent]          ← deterministic, no LLM
-      ↓
-  [Zero Trust Evaluation] ← is_trust_acceptable()
-      │ Yes → [ALLOW]
-      │ No
-      ↓
-  [Response Agent]  (LLM evaluate_incident)
-      ↓
-  [SOAR Playbooks]
-      ↓
-  [Update Trust Score → Feedback Loop → End]
-
-Changes from previous version
-------------------------------
-FIX 1 — RCF threshold gate: run() implements the "Is Anomaly Score >
-         Threshold?" diamond at the top of the flowchart. Events that fall
-         below the RCF threshold are logged and returned early without
-         ever reaching the Policy Agent or LLM.
-
-FIX 2 — Signature consistency: _add_to_allowlist / _add_to_quarantine now
-         accept a TrustEvaluation and reuse trust_eval.behavior_signature
-         instead of recomputing the signature from raw telemetry. This
-         guarantees the memory key always matches what PolicyAgent wrote.
-
-FIX 3 — Removed redundant fast-path checks from evaluate_incident. The
-         PolicyAgent already handles quarantine/allowlist signals via
-         _apply_memory_signals. Duplicating the logic produced misleading
-         audit trails where a full TrustEvaluation was written but the
-         actual decision came from a silent memory lookup inside the LLM
-         method. PolicyAgent is now the single source of truth for memory
-         signals.
-
-FIX 4 — execute_playbook now receives and logs the full TrustEvaluation
-         dict so the Splunk ingest step can carry the complete audit trail.
-
-FIX 5 (Issue 1 — Dynamic allowlist never populated): evaluate_incident
-         Rule 1 previously set is_false_positive: false for ALL low-risk
-         ALLOW decisions, so _trigger_feedback_loop's condition
-         (playbook=="ALLOW" and is_fp==True) was never satisfied.
-         Rule 1 now sets is_false_positive: true when fused_risk is low
-         AND threat classification is Normal — these are genuine FPs that
-         should be memorised and fast-pathed on future encounters.
-
-FIX 6 (Issue 2 — Agent flags everything as attack / overtune): The ML
-         optimal_threshold (a binary classification boundary tuned on
-         probability outputs) was being reused as the ZeroTrust trust score
-         floor. The trust score starts at 1.0 and accumulates penalties from
-         5+ independent policy signals — using 0.7448 as the floor meant any
-         event with an unapproved protocol + after-hours access was
-         permanently below threshold regardless of ML scores, routing 100%
-         of escalated events to the LLM which then applied NETWORK_ISOLATION
-         by default.
-         Fix: self.trust_threshold is now loaded from policy_config.json
-         ("trust_score_threshold", default 0.40) and used exclusively for
-         the ZeroTrust diamond. The ML optimal_threshold is used exclusively
-         for the RCF gate. These two thresholds operate on completely
-         different scales and must never be the same value.
-
-FIX 7 (Issue 2 — isolation_trigger arithmetic bug): The old formula
-         min(optimal_threshold + 0.35, 0.75) evaluated to 0.75 when
-         optimal_threshold=0.7448, which is BELOW the detection threshold.
-         Rule 3 therefore fired for virtually every event reaching the LLM.
-         isolation_trigger is now optimal_threshold + 0.15, placing full
-         containment only at genuinely high-risk scores (≥0.895 at the
-         default threshold).
-"""
-
 import json
 import datetime
 import requests
@@ -149,18 +63,6 @@ class ZeroTrustSOARAgent:
         # Falls back to 0.5 only if the file is missing (e.g. first run before training).
         self.optimal_threshold = self._load_threshold(threshold_file)
 
-        # FIX (Issue 2 — Overtune): The ML optimal_threshold (tuned for binary
-        # classification on a 0-1 probability output) must NOT double as the
-        # ZeroTrust diamond floor.  The trust score is a completely different
-        # quantity — it starts at 1.0 and accumulates additive penalties from
-        # 5+ independent policy signals.  Using 0.7448 as the trust floor means
-        # nearly every event with any violation (unapproved proto, after-hours,
-        # non-Normal threat class) is permanently unacceptable regardless of how
-        # benign the ML scores are, causing the LLM to see every escalated event
-        # and apply NETWORK_ISOLATION by default.
-        # The trust_threshold is loaded from policy_config.json ("trust_score_threshold")
-        # and defaults to 0.40 — a value calibrated to the PolicyAgent's penalty
-        # budget (max total penalties for a clean low-risk event ≈ 0.30–0.40).
         self.trust_threshold = self.policy_agent.config.get("trust_score_threshold", 0.40)
 
     def _load_threshold(self, threshold_file: str, fallback: float = 0.5) -> float:
@@ -245,10 +147,6 @@ class ZeroTrustSOARAgent:
             print(f"              Violations: {', '.join(trust_eval.policy_violations)}")
 
         # ── Stage 3: Zero Trust Evaluation (flowchart diamond #2) ─────
-        # FIX (Issue 2): Uses self.trust_threshold (loaded from policy_config.json,
-        # default 0.40), NOT the ML optimal_threshold.  The trust score starts at
-        # 1.0 and is penalised by multiple independent policy signals — mapping the
-        # ML binary threshold onto this scale causes near-universal failure.
         is_trust_ok = self.policy_agent.is_trust_acceptable(trust_eval, threshold=self.trust_threshold)
         
         # GREY ZONE GUARDRAIL: Never fast-path if the ML is highly confident it is an attack
@@ -460,26 +358,6 @@ class ZeroTrustSOARAgent:
         """
         LLM-based Response Agent (DeepSeek-R1 via Ollama).
         Only called when PolicyAgent deems trust unacceptable.
-
-        FIX (Issue 1 — Allowlist never populated): The original Rule 1 set
-        is_false_positive: false for all low-risk ALLOW decisions, so the
-        feedback loop condition (playbook=="ALLOW" and is_fp==True) was never
-        satisfied and the dynamic allowlist stayed empty forever.  Rule 1 now
-        sets is_false_positive: true when fused_risk is low AND the threat
-        classification is Normal — these are the confirmed false positives that
-        should be remembered and fast-pathed on future encounters.
-
-        FIX (Issue 2 — isolation_trigger arithmetic): The old formula was
-        min(optimal_threshold + 0.35, 0.75).  When optimal_threshold=0.7448,
-        this evaluates to min(1.0948, 0.75)=0.75, which is LOWER than the
-        optimal_threshold itself.  Rule 3 then fired for almost every event
-        that reached the LLM (fused_risk > 0.75), producing wall-to-wall
-        NETWORK_ISOLATION.  The trigger is now set to a fixed offset ABOVE
-        the optimal_threshold so it only fires on genuinely high-risk events.
-
-        FIX (Issue 3 — Removed redundant fast-path checks): already in place
-        from the previous fix pass; PolicyAgent remains the single source of
-        truth for memory signals.
         """
         mfa_trigger = optimal_threshold
         # Isolation fires only when fused_risk is materially above the detection
@@ -490,81 +368,51 @@ class ZeroTrustSOARAgent:
         isolation_trigger = min(optimal_threshold + 0.15, 0.90)
 
         raw_rules = self.playbooks.get("routing_rules", [])
-        
+
+        # Only send the pre-defined native string rules to the LLM.
+        # Learned dict rules (LEARNED_NNN / FN_PATCH_NNN) are managed by
+        # PlaybookEditorAgent.consolidate_rules() and must not pollute the
+        # response-agent prompt with pre-consolidation noise.
+        native_rules = [r for r in raw_rules if isinstance(r, str)]
+
         # Inject the dynamic thresholds into the strings
         formatted_rules = []
-        for rule in raw_rules:
-            # Handle AI-learned rules (Dictionaries) vs Native rules (Strings)
-            if isinstance(rule, dict):
-                rule_str = f"{rule.get('id')}: {rule.get('condition')} Playbook is '{rule.get('playbook')}' (is_false_positive: {str(rule.get('is_fp', True)).lower()})."
-            else:
-                rule_str = rule
-                
-            formatted_rule = rule_str.replace("{mfa_trigger}", f"{mfa_trigger:.4f}")
+        for rule in native_rules:
+            formatted_rule = rule.replace("{mfa_trigger}", f"{mfa_trigger:.4f}")
             formatted_rule = formatted_rule.replace("{isolation_trigger}", f"{isolation_trigger:.4f}")
             formatted_rules.append(formatted_rule)
             
         rules_text = "\n        ".join(formatted_rules)
 
-        system_prompt = f"""
-        You are an AI SOC Analyst evaluating network telemetry and ML risk scores.
-        Your goal is to enforce Zero Trust while preventing alert fatigue.
-        OUTPUT CONSTRAINTS:
-        CRITICAL INSTRUCTION: DO NOT USE <think> TAGS. DO NOT OUTPUT ANY REASONING OUTSIDE THE JSON.
-        Output ONLY a raw JSON object. No markdown, no preamble. Reasoning: 1-2 concise technical sentences.
+        # ── Slim context — only the fields the rules actually reference ──────
+        telemetry = context.get("network_telemetry", {})
+        ml = context.get("ml_risk_profile", {})
+        slim_context = {
+            "fused_risk":   ml.get("fused_risk"),
+            "cat_risk":     ml.get("categorical_risk"),
+            "threat_class": context.get("predicted_threat_classification"),
+            "proto":        telemetry.get("proto"),
+            "service":      telemetry.get("service"),
+            "state":        telemetry.get("state"),
+            "spkts":        telemetry.get("spkts"),
+            "dpkts":        telemetry.get("dpkts"),
+        }
 
-        EVALUATION RULES (apply in order, first match wins):
-        {rules_text}
-
-        --- TRAINING EXAMPLES (FEW-SHOT) ---
-
-        [Example 1: The TCP Teardown False Positive]
-        Context: {{"ml_risk_profile": {{"fused_risk": 0.89}}, "predicted_threat_classification": "Fuzzers", "network_telemetry": {{"proto": "tcp", "state": "FIN", "spkts": 4, "dpkts": 4}}}}
-        Output: {{
-            "reasoning": "Standard TCP FIN teardown with very low packet count. ML misclassification of 'Fuzzers'. Rule 5 overridden due to benign telemetry.",
-            "playbook": "ALLOW",
-            "is_false_positive": true
-        }}
-
-        [Example 2: The True Stealth Reconnaissance]
-        Context: {{"ml_risk_profile": {{"fused_risk": 0.85}}, "predicted_threat_classification": "Reconnaissance", "network_telemetry": {{"proto": "udp", "state": "INT", "spkts": 250, "dpkts": 0}}}}
-        Output: {{
-            "reasoning": "High outbound UDP packet volume with zero response confirms unidirectional scanning. Rule 5 applies.",
-            "playbook": "NETWORK_ISOLATION",
-            "is_false_positive": false
-        }}
-
-        [Example 3: The True Volumetric Attack]
-        Context: {{"ml_risk_profile": {{"fused_risk": 0.99}}, "predicted_threat_classification": "DoS", "network_telemetry": {{"proto": "tcp", "state": "REQ", "spkts": 15000, "dpkts": 200}}}}
-        Output: {{
-            "reasoning": "Massive packet asymmetry and high anomaly scores confirm volumetric DoS. Rule 3 applies.",
-            "playbook": "RATE_LIMIT_DOS",
-            "is_false_positive": false
-        }}
-
-        [Example 4: The Benign High-Privilege Admin]
-        Context: {{"ml_risk_profile": {{"fused_risk": 0.10}}, "predicted_threat_classification": "Normal", "network_telemetry": {{"proto": "tcp", "service": "ssh", "spkts": 50, "dpkts": 60}}}}
-        Output: {{
-            "reasoning": "Bidirectional SSH traffic with low risk scores and Normal threat class. Rule 1 applies — confirmed false positive, signature memorised for fast-path.",
-            "playbook": "ALLOW",
-            "is_false_positive": true
-        }}
-        --- END EXAMPLES ---
-
-        OUTPUT CONSTRAINTS:
-        Output ONLY a raw JSON object. No markdown, no preamble. Reasoning: 1-2 concise technical sentences.
-
-        {{
-            "reasoning": "...",
-            "playbook": "ALLOW" | "STEP_UP_AUTH" | "NETWORK_ISOLATION" | "RATE_LIMIT_DOS",
-            "is_false_positive": true | false
-        }}
-        """
-
-        user_prompt = (
-            f"Evaluate this context strictly according to the rules and output ONLY JSON:\n"
-            f"{json.dumps(context, indent=2, cls=_NumpyEncoder)}"
+        system_prompt = (
+            "You are a SOC analyst. Apply the rules below in order — first match wins. "
+            "Output ONLY a JSON object, no markdown, no preamble\n\n"
+            "RULES:\n"
+            f"{rules_text}\n\n"
+            "EXAMPLES:\n"
+            '{"fused_risk":0.85,"threat_class":"Reconnaissance","proto":"udp","state":"INT","spkts":250,"dpkts":0} '
+            '-> {"reasoning":"Unidirectional UDP scan, zero response — confirmed recon. Rule 5.","playbook":"NETWORK_ISOLATION","is_false_positive":false}\n'
+            '{"fused_risk":0.82,"threat_class":"Normal","proto":"tcp","state":"FIN","spkts":4,"dpkts":4} '
+            '-> {"reasoning":"Symmetric TCP teardown, Normal class, low packet count — ML false positive.","playbook":"ALLOW","is_false_positive":true}\n\n'
+            "OUTPUT (return exactly this structure, nothing else):\n"
+            '{"reasoning":"<1-2 sentences>","playbook":"ALLOW|STEP_UP_AUTH|NETWORK_ISOLATION|RATE_LIMIT_DOS","is_false_positive":true|false}'
         )
+
+        user_prompt = json.dumps(slim_context, cls=_NumpyEncoder)
 
         url = "http://localhost:11434/api/generate"
         payload = {
@@ -574,14 +422,8 @@ class ZeroTrustSOARAgent:
             "stream": False,
             "options": {
                 "temperature": 0.0,
-                # FIX (LLM timeout): Cap token generation so the model cannot
-                # spend minutes producing a long <think> chain before the JSON.
-                # 512 tokens is ample for a 3-field JSON object with 1-2 sentence
-                # reasoning. The <think> strip regex handles any residual CoT.
-                # Also set OLLAMA_KEEP_ALIVE=-1 in your environment so the model
-                # stays loaded between events and avoids the ~60s reload penalty:
-                #   export OLLAMA_KEEP_ALIVE=-1 && ollama serve
-                "num_predict": 512,
+                "num_predict": 3072,
+                "stop": ["\n}\n", "}\n\n"]  # ← halt right after the JSON closes
             }
         }
 
@@ -589,6 +431,10 @@ class ZeroTrustSOARAgent:
             response = requests.post(url, json=payload, timeout=240)
             response.raise_for_status()
             raw_text = response.json()["response"]
+
+            # DEBUG — remove once stable; shows first 300 chars so you can see if
+            # the model is still overflowing its think chain or outputting garbage
+            print(f"[DEBUG] LLM raw ({len(raw_text)} chars): {raw_text[:300]!r}")
 
             # 1. Strip think tags (even if the model got cut off and forgot the closing tag)
             cleaned = re.sub(r"<think>.*?(?:</think>|$)", "", raw_text, flags=re.DOTALL).strip()
@@ -603,21 +449,31 @@ class ZeroTrustSOARAgent:
             return json.loads(cleaned)
         
         except requests.exceptions.Timeout:
-            print(f"[ERROR] LLM Evaluation Timeout: Ollama did not respond within 240 seconds.")
+            print(f"[ERROR] LLM Network Timeout: Ollama did not respond within 240 seconds.")
             return {
-                "reasoning": "Fail-safe triggered due to LLM evaluation timeout.",
+                "reasoning": "Fail-safe: Ollama network timeout (>240s).",
                 "playbook": "NETWORK_ISOLATION",
                 "is_false_positive": False,
-                "is_llm_failsafe": True   # prevents PlaybookEditorAgent writing rules from this decision
+                "is_llm_failsafe": True
+            }
+
+        except ValueError as e:
+            # Model hit num_predict cap inside <think> and produced no JSON
+            print(f"[ERROR] LLM JSON Parse Failed: {e} — model likely exhausted token budget in <think> chain.")
+            return {
+                "reasoning": "Fail-safe: model output no parseable JSON (think-chain overflow).",
+                "playbook": "NETWORK_ISOLATION",
+                "is_false_positive": False,
+                "is_llm_failsafe": True
             }
 
         except Exception as e:
-            print(f"[ERROR] Local LLM Evaluation Failed: {e}")
+            print(f"[ERROR] LLM Evaluation Failed (unexpected): {type(e).__name__}: {e}")
             return {
-                "reasoning": "Fail-safe triggered due to LLM evaluation timeout/error.",
+                "reasoning": "Fail-safe: unexpected LLM error.",
                 "playbook": "NETWORK_ISOLATION",
                 "is_false_positive": False,
-                "is_llm_failsafe": True   # prevents PlaybookEditorAgent writing rules from this decision
+                "is_llm_failsafe": True
             }
 
     # ------------------------------------------------------------------

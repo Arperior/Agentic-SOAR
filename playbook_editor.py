@@ -1,47 +1,3 @@
-"""
-playbook_editor_agent.py — Autonomous Self-Learning Playbook Editor
-
-Implements the autonomous feedback loop described in the SOAR design.
-During training/evaluation, if the SOAR engine makes a mistake 
-(e.g., isolates ground-truth NORMAL traffic), it triggers this agent:
-
-  [SOAR makes a False Positive during evaluation]
-      ↓
-  [PlaybookEditorAgent.autonomous_fp_correction()]
-      ↓
-  [LLM autonomously audits the context and diagnoses the failure]
-      ↓
-  [LLM synthesises a new routing rule to prevent recurrence]
-      ↓
-  [Rule + audit record written to playbooks.json]
-      ↓
-  [dynamic_allowlist updated in agent memory]
-      ↓
-  [Future events matching this pattern → ALLOW fast-path]
-
-Additional capabilities
------------------------
-Rule health tracking (NEW):
-  Every FN correction now extracts the rule cited in the LLM's reasoning
-  and records it in rule_health.json. Rules that cause FN_THRESHOLD (default 2)
-  false negatives are flagged. Call review_flagged_rules() at the end of an
-  evaluation run to see which rules need human attention.
-
-  Key methods:
-    record_rule_implicated_in_fn(rule_id, event_id, reasoning)
-    review_flagged_rules()
-    _extract_implicated_rule(text) -> Optional[str]
-
-Rule consolidation (from previous fix pass):
-  Call consolidate_rules() every N events to merge near-duplicate learned
-  rules into broader generalisations and prevent rule bloat.
-
-Fuzzy dedup on insert (from previous fix pass):
-  _append_rule_to_playbooks uses _conditions_overlap() to detect when a
-  new rule is a narrower or broader version of an existing rule, rather
-  than relying on exact-string matching alone.
-"""
-
 import json
 import datetime
 import re
@@ -177,7 +133,9 @@ class PlaybookEditorAgent:
 
         telemetry       = context.get("network_telemetry", {})
         trust_eval_dict = decision.get("trust_eval") or {}
-        sig = trust_eval_dict.get("behavior_signature") or self._derive_signature(telemetry)
+        sig = trust_eval_dict.get("behavior_signature") or self._derive_signature(
+            telemetry, threat_class=context.get("predicted_threat_classification", "unknown")
+        )
 
         print(f"  Behaviour sig: {sig}")
 
@@ -280,7 +238,9 @@ class PlaybookEditorAgent:
         # ── Step 1: Extract the behaviour signature ───────────────────
         telemetry  = context.get("network_telemetry", {})
         trust_eval_dict = decision.get("trust_eval") or {}
-        sig = trust_eval_dict.get("behavior_signature") or self._derive_signature(telemetry)
+        sig = trust_eval_dict.get("behavior_signature") or self._derive_signature(
+            telemetry, threat_class=context.get("predicted_threat_classification", "unknown")
+        )
 
         print(f"  Behaviour sig: {sig}")
 
@@ -710,11 +670,20 @@ RULES:
             raw = response.json().get("response", "")
             return re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
         except requests.exceptions.Timeout:
-            print("[PlaybookEditorAgent] LLM timeout during analysis.")
-            return None
-        except Exception as exc:
-            print(f"[PlaybookEditorAgent] LLM call failed: {exc}")
-            return None
+            print(f"[ERROR] LLM Evaluation Timeout: Ollama did not respond within 240 seconds.")
+            return {"reasoning": "Fail-safe: network timeout.", "playbook": "NETWORK_ISOLATION",
+                    "is_false_positive": False, "is_llm_failsafe": True}
+
+        except ValueError as e:
+            # JSON parse failure — model generated think chain but no valid JSON
+            print(f"[ERROR] LLM JSON Parse Failed: {e}")
+            return {"reasoning": "Fail-safe: model output no parseable JSON (likely think-chain overflow).",
+                    "playbook": "NETWORK_ISOLATION", "is_false_positive": False, "is_llm_failsafe": True}
+
+        except Exception as e:
+            print(f"[ERROR] LLM Evaluation Failed (unexpected): {e}")
+            return {"reasoning": "Fail-safe: unexpected LLM error.", "playbook": "NETWORK_ISOLATION",
+                    "is_false_positive": False, "is_llm_failsafe": True}
 
     # ------------------------------------------------------------------
     # Playbook I/O
@@ -948,11 +917,20 @@ OUTPUT FORMAT:
             print(f"[PlaybookEditorAgent] '{sig}' added to active_quarantines.")
 
     @staticmethod
-    def _derive_signature(telemetry: dict) -> str:
+    def _derive_signature(telemetry: dict, threat_class: str = "unknown") -> str:
+        """
+        Produces a behaviour signature used as the memory key for allowlist/quarantine.
+
+        threat_class is included to prevent ping-pong: without it, genuinely distinct
+        traffic (e.g. a benign FIN teardown vs a Fuzzer attack) collapses to the same
+        key (tcp_-_FIN), causing allowlist/quarantine to flip-flop on the same signature.
+        Including threat_class means tcp_-_FIN_Normal and tcp_-_FIN_Fuzzers are tracked
+        independently, so a patch rule for one never contaminates the other.
+        """
         proto   = telemetry.get("proto",   "unknown")
         service = telemetry.get("service", "unknown")
         state   = telemetry.get("state",   "unknown")
-        return f"{proto}_{service}_{state}"
+        return f"{proto}_{service}_{state}_{threat_class}"
 
     # ------------------------------------------------------------------
     # Rule health I/O

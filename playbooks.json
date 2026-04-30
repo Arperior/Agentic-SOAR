@@ -1,12 +1,12 @@
 {
     "routing_rules": [
         {
-            "id": "FN_PATCH_005",
-            "condition": "proto=udp AND dpkts=0",
-            "playbook": "NETWORK_ISOLATION",
-            "is_fn": true,
-            "rationale": "Catches UDP traffic with no dropped packets to prevent similar false negatives.",
-            "created_at": "2026-04-30T16:00:30.698882",
+            "id": "LEARNED_005",
+            "condition": "proto=udp AND state=INT",
+            "playbook": "ALLOW",
+            "is_fp": true,
+            "rationale": "Allows benign UDP traffic with low packet counts to prevent false isolation.",
+            "created_at": "2026-04-30T19:51:41.880620",
             "source": "PlaybookEditorAgent"
         },
         {
@@ -14,41 +14,41 @@
             "condition": "proto=udp AND state=INT AND threat_class=Shellcode",
             "playbook": "NETWORK_ISOLATION",
             "is_fn": true,
-            "rationale": "To detect Shellcode attacks with UDP and intermediate state to prevent false negatives.",
-            "created_at": "2026-04-30T15:51:18.357648",
+            "rationale": "Catches UDP Shellcode attacks with INT state to prevent allowlist bypass.",
+            "created_at": "2026-04-30T19:27:24.097390",
             "source": "PlaybookEditorAgent"
         },
         {
-            "id": "LEARNED_003",
-            "condition": "proto=tcp AND state=FIN AND spkts=20.0 AND dpkts=12.0",
+            "id": "LEARNED_004",
+            "condition": "proto=tcp AND state=FIN",
             "playbook": "ALLOW",
             "is_fp": true,
-            "rationale": "Allows specific benign TCP FIN packets with packet counts to prevent false positive isolation.",
-            "created_at": "2026-04-30T02:15:49.402530",
+            "rationale": "Corrects false positive by allowing benign TCP FIN traffic with specific characteristics.",
+            "created_at": "2026-04-30T19:31:51.989864",
             "source": "PlaybookEditorAgent"
         },
         {
-            "id": "FN_PATCH_002",
-            "condition": "IF proto == \"tcp\" AND state == \"FIN\" AND threat_class == \"Fuzzers\"",
+            "id": "LEARNED_004",
+            "condition": "proto=udp AND state=INT",
+            "playbook": "ALLOW",
+            "is_fp": true,
+            "rationale": "To prevent false isolation of UDP traffic with state INT.",
+            "created_at": "2026-04-30T19:35:24.931369",
+            "source": "PlaybookEditorAgent"
+        },
+        {
+            "id": "FN_PATCH_001",
+            "condition": "proto=tcp AND state=FIN AND threat_class=Fuzzers",
             "playbook": "NETWORK_ISOLATION",
             "is_fn": true,
-            "rationale": "This rule detects Fuzzer attacks with a TCP FIN state, which was the missed pattern, by classifying them as NETWORK_ISOLATION to prevent similar False Negatives.",
-            "created_at": "2026-04-30T01:14:59.164222",
-            "source": "PlaybookEditorAgent"
-        },
-        {
-            "id": "LEARNED_001",
-            "condition": "IF proto == 'tcp' AND state == 'FIN'",
-            "playbook": "ALLOW",
-            "is_fp": true,
-            "rationale": "This rule allows benign TCP traffic with a FIN state, which was misclassified as fuzzing activity, thereby preventing the high fused_risk score from incorrectly flagging normal traffic.",
-            "created_at": "2026-04-30T01:04:55.330667",
+            "rationale": "Direct detection of Fuzzers with TCP FIN state to prevent missed attacks.",
+            "created_at": "2026-04-30T19:27:24.097390",
             "source": "PlaybookEditorAgent"
         },
         "1. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Playbook is 'ALLOW' (is_false_positive: true).",
         "2. IF 'fused_risk' <= {mfa_trigger} AND 'predicted_threat_classification' != 'Normal': Playbook is 'ALLOW' (is_false_positive: false).",
         "3. IF 'predicted_threat_classification' == 'DoS': Playbook is 'RATE_LIMIT_DOS' (is_false_positive: false).",
-        "4. IF 'predicted_threat_classification' == 'Shellcode' AND 'network_telemetry' shows 'proto' as 'udp' AND 'dpkts' is 0: Playbook is 'ALLOW' (is_false_positive: true).",
+        "4. IF 'predicted_threat_classification' == 'Shellcode' AND 'proto' == 'udp' AND 'dpkts' == 0 AND 'fused_risk' < {mfa_trigger}: Playbook is 'ALLOW' (is_false_positive: true). NOTE: This rule applies ONLY to Shellcode misclassifications with low fused risk. Generic, Reconnaissance, or other non-Normal threat classes with dpkts=0 are NOT covered by this rule.",
         "5. IF 'fused_risk' > {isolation_trigger}: Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).",
         "6. IF 'predicted_threat_classification' != 'Normal' AND 'predicted_threat_classification' != 'DoS': Playbook is 'NETWORK_ISOLATION' (is_false_positive: false).",
         "7. IF 'fused_risk' > {mfa_trigger} AND 'predicted_threat_classification' == 'Normal': Inspect telemetry. If standard benign traffic, 'ALLOW'. Otherwise, 'STEP_UP_AUTH'."
@@ -146,34 +146,53 @@
     },
     "learned_rule_audit": [
         {
-            "rule_id": "LEARNED_001",
-            "event_id": 74562,
-            "trigger": "Autonomous_Evaluation_FP",
-            "appended_at": "2026-04-30T01:04:55.330667"
-        },
-        {
-            "rule_id": "FN_PATCH_002",
-            "event_id": 61394,
+            "rule_id": "FN_PATCH_001",
+            "event_id": 114886,
             "trigger": "Autonomous_Evaluation_FN",
-            "appended_at": "2026-04-30T01:14:59.164222"
+            "appended_at": "2026-04-30T19:27:24.097390",
+            "replaced": null
         },
         {
-            "rule_id": "LEARNED_003",
-            "event_id": 74562,
+            "rule_id": "LEARNED_002",
+            "event_id": 88112,
             "trigger": "Autonomous_Evaluation_FP",
-            "appended_at": "2026-04-30T02:15:49.402530"
+            "appended_at": "2026-04-30T19:31:51.989864",
+            "replaced": null
+        },
+        {
+            "rule_id": "FN_PATCH_003",
+            "event_id": 80390,
+            "trigger": "Autonomous_Evaluation_FN",
+            "appended_at": "2026-04-30T19:34:09.090593",
+            "replaced": null
+        },
+        {
+            "rule_id": "LEARNED_004",
+            "event_id": 87856,
+            "trigger": "Autonomous_Evaluation_FP",
+            "appended_at": "2026-04-30T19:35:24.931369",
+            "replaced": null
+        },
+        {
+            "rule_id": "LEARNED_004",
+            "event_id": 107004,
+            "trigger": "Autonomous_Evaluation_FP",
+            "appended_at": "2026-04-30T19:39:36.367404",
+            "replaced": null
         },
         {
             "rule_id": "FN_PATCH_004",
-            "event_id": 121072,
+            "event_id": 82792,
             "trigger": "Autonomous_Evaluation_FN",
-            "appended_at": "2026-04-30T15:51:18.357648"
+            "appended_at": "2026-04-30T19:46:59.967284",
+            "replaced": null
         },
         {
-            "rule_id": "FN_PATCH_005",
-            "event_id": 154565,
-            "trigger": "Autonomous_Evaluation_FN",
-            "appended_at": "2026-04-30T16:00:30.698882"
+            "rule_id": "LEARNED_005",
+            "event_id": 75280,
+            "trigger": "Autonomous_Evaluation_FP",
+            "appended_at": "2026-04-30T19:51:41.880620",
+            "replaced": null
         }
     ]
 }

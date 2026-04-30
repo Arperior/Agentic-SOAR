@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import json
 import os
 from catboost import CatBoostClassifier
 from sklearn.metrics import confusion_matrix, classification_report
@@ -45,8 +44,6 @@ def _fit_num_pipeline(X_num_raw_tr):
     """
     Fits a StandardScaler + PCA(0.95) on the provided raw numerical array/frame.
     Returns (scaler, pca, X_num_transformed_as_DataFrame).
-    Kept as a helper so the exact same logic runs both inside OOF folds and
-    in prepare_datasets for the final full-train artifact.
     """
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_num_raw_tr)
@@ -80,13 +77,7 @@ def generate_oof_features(
 ):
     """
     Generates clean, Out-of-Fold predictions to train the Meta-Learner.
-
-    FIX (PCA Leakage): X_num_raw (the RAW, unscaled numerical frame) is now
-    passed in instead of the PCA-transformed X_num.  A fresh StandardScaler
-    and PCA are fit on X_num_tr inside every fold so the validation split
-    never influences the PCA eigenvectors.  The saved scaler/PCA artifacts
-    (written by prepare_datasets) are NOT used here — they are only for
-    final test-set inference.
+        - The CatBoost and RCF models are trained from scratch within each fold,
 
     Parameters
     ----------

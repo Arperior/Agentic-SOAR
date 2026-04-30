@@ -1,60 +1,58 @@
 {
     "dynamic_allowlist": [
         "tcp_-_FIN",
-        "udp_dns_INT"
+        "udp_-_INT"
     ],
     "active_quarantines": [
-        "iso-ip_-_INT",
-        "ospf_-_REQ",
-        "udp_dns_INT",
-        "tcp_http_FIN",
-        "tcp_ftp_FIN",
-        "encap_-_INT",
-        "vmtp_-_INT",
         "tcp_smtp_FIN",
-        "udp_-_INT",
-        "tcp_-_FIN",
+        "iso-ip_-_INT",
+        "vmtp_-_INT",
         "ib_-_INT",
+        "tcp_http_FIN",
+        "ospf_-_REQ",
+        "tcp_ftp_FIN",
         "unas_-_INT",
-        "sprite-rpc_-_INT"
+        "sprite-rpc_-_INT",
+        "encap_-_INT",
+        "udp_dns_INT"
     ],
     "trust_scores": {
         "tcp_ftp_FIN": {
             "latest": 0.0,
-            "previous": 0.0,
-            "evaluated_at": "2026-04-30T16:00:55.515865",
+            "previous": 0.0108,
+            "evaluated_at": "2026-04-30T19:29:30.062519",
             "violations": []
         },
         "udp_dns_INT": {
             "latest": 0.0006,
-            "previous": 0.0009,
-            "evaluated_at": "2026-04-30T16:04:57.596261",
+            "previous": 0.0006,
+            "evaluated_at": "2026-04-30T19:50:26.820237",
             "violations": []
         },
         "tcp_-_FIN": {
-            "latest": 0.1552,
-            "previous": 0.1456,
-            "evaluated_at": "2026-04-30T16:00:30.709800",
+            "latest": 0.1285,
+            "previous": 0.7055,
+            "evaluated_at": "2026-04-30T19:53:27.089702",
             "violations": []
         },
         "tcp_smtp_FIN": {
             "latest": 0.0,
             "previous": 0.3009,
-            "evaluated_at": "2026-04-30T00:48:41.916909",
+            "evaluated_at": "2026-04-30T19:48:20.159343",
             "violations": []
         },
         "vmtp_-_INT": {
-            "latest": 0.0,
-            "previous": 0.3506,
-            "evaluated_at": "2026-04-30T15:56:50.324243",
+            "latest": 0.3503,
+            "previous": null,
+            "evaluated_at": "2026-04-30T19:29:30.062519",
             "violations": [
                 "UNAPPROVED_COMBO: vmtp_-"
             ]
         },
         "udp_-_INT": {
-            "latest": 0.4657,
-            "previous": 0.4657,
-            "evaluated_at": "2026-04-30T15:50:04.439524",
+            "latest": 0.0,
+            "previous": 0.457,
+            "evaluated_at": "2026-04-30T19:50:26.822111",
             "violations": [
                 "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold"
             ]
@@ -62,7 +60,7 @@
         "tcp_http_FIN": {
             "latest": 0.0,
             "previous": 0.0,
-            "evaluated_at": "2026-04-30T00:46:29.746879",
+            "evaluated_at": "2026-04-30T19:46:59.972066",
             "violations": [
                 "HIGH_SEVERITY_THREAT: Worms exceeds critical threshold"
             ]
@@ -70,7 +68,7 @@
         "unas_-_INT": {
             "latest": 0.0,
             "previous": 0.0,
-            "evaluated_at": "2026-04-30T00:48:14.693602",
+            "evaluated_at": "2026-04-30T19:48:20.158316",
             "violations": [
                 "UNAPPROVED_COMBO: unas_-"
             ]
@@ -78,7 +76,7 @@
         "encap_-_INT": {
             "latest": 0.3506,
             "previous": null,
-            "evaluated_at": "2026-04-30T00:34:19.238863",
+            "evaluated_at": "2026-04-30T19:39:36.378960",
             "violations": [
                 "UNAPPROVED_COMBO: encap_-"
             ]
@@ -86,7 +84,7 @@
         "sprite-rpc_-_INT": {
             "latest": 0.3506,
             "previous": null,
-            "evaluated_at": "2026-04-30T00:43:53.941641",
+            "evaluated_at": "2026-04-30T19:43:38.854559",
             "violations": [
                 "UNAPPROVED_COMBO: sprite-rpc_-"
             ]
@@ -94,7 +92,7 @@
         "ib_-_INT": {
             "latest": 0.3506,
             "previous": null,
-            "evaluated_at": "2026-04-30T00:45:58.898006",
+            "evaluated_at": "2026-04-30T19:45:24.564179",
             "violations": [
                 "UNAPPROVED_COMBO: ib_-"
             ]
@@ -102,7 +100,7 @@
         "ospf_-_REQ": {
             "latest": 0.3503,
             "previous": null,
-            "evaluated_at": "2026-04-30T00:52:36.622596",
+            "evaluated_at": "2026-04-30T19:51:41.885191",
             "violations": [
                 "UNAPPROVED_COMBO: ospf_-"
             ]
@@ -110,7 +108,7 @@
         "iso-ip_-_INT": {
             "latest": 0.3506,
             "previous": null,
-            "evaluated_at": "2026-04-30T00:55:15.514531",
+            "evaluated_at": "2026-04-30T19:54:57.482284",
             "violations": [
                 "UNAPPROVED_COMBO: iso-ip_-"
             ]

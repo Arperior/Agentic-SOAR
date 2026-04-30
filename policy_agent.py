@@ -1,20 +1,3 @@
-"""
-policy_agent.py — Deterministic Zero Trust Policy Agent
-
-Sits upstream of the LLM (ZeroTrustSOARAgent.evaluate_incident).
-Takes the fused ML context + agent memory and produces a structured
-TrustEvaluation. The ZeroTrustSOARAgent gates on is_trust_acceptable()
-before deciding whether to route to the LLM at all.
-
-Design principles:
-  - Fully deterministic: no LLM calls, no randomness.
-  - Extensible: each trust factor is an isolated method.
-  - Config-driven: organizational policy lives in policy_config.json,
-    not hardcoded constants.
-  - Auditable: every penalty/bonus is recorded in the TrustEvaluation
-    so the SOC analyst can see exactly why a score was produced.
-"""
-
 import os
 import json
 import datetime
@@ -223,7 +206,7 @@ class PolicyAgent:
         telemetry = context.get("network_telemetry", {})
         ml_profile = context.get("ml_risk_profile", {})
         threat_type = context.get("predicted_threat_classification", "UNKNOWN")
-        behavior_signature = self._get_signature(telemetry)
+        behavior_signature = self._get_signature(telemetry, threat_type)
         event_timestamp = context.get("timestamp", datetime.datetime.now().isoformat())
         score = 1.0   # start at full trust; factors penalize downward
         factors: list[TrustFactor] = []
@@ -478,8 +461,8 @@ class PolicyAgent:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _get_signature(telemetry: dict) -> str:
+    def _get_signature(telemetry: dict, threat_class: str = "unknown") -> str:
         proto = telemetry.get("proto", "unknown")
         service = telemetry.get("service", "unknown")
         state = telemetry.get("state", "unknown")
-        return f"{proto}_{service}_{state}"
+        return f"{proto}_{service}_{state}_{threat_class}"
