@@ -6,6 +6,7 @@ import os
 import numpy as np
 
 from policy_agent import PolicyAgent, TrustEvaluation
+from vector_memory import VectorMemory
 
 
 class _NumpyEncoder(json.JSONEncoder):
@@ -64,6 +65,7 @@ class ZeroTrustSOARAgent:
         self.optimal_threshold = self._load_threshold(threshold_file)
 
         self.trust_threshold = self.policy_agent.config.get("trust_score_threshold", 0.40)
+        self.vector_memory = VectorMemory()
 
     def _load_threshold(self, threshold_file: str, fallback: float = 0.5) -> float:
         if not os.path.exists(threshold_file):
@@ -116,10 +118,8 @@ class ZeroTrustSOARAgent:
         ml_profile = context["ml_risk_profile"]
 
         # ── Stage 1: Fused ML Gate (flowchart diamond #1) ──────────
-        # Uses the ML-optimised threshold — this is the correct domain for it.
-        # Events below the fused threshold are logged and returned early.
         fused_score = ml_profile.get("fused_risk", 0.0)
-        
+
         if fused_score <= threshold:
             print(
                 f"\n[ML Gate]   fused_risk={fused_score:.4f} ≤ threshold={threshold:.4f} "
@@ -148,17 +148,11 @@ class ZeroTrustSOARAgent:
 
         # ── Stage 3: Zero Trust Evaluation (flowchart diamond #2) ─────
         is_trust_ok = self.policy_agent.is_trust_acceptable(trust_eval, threshold=self.trust_threshold)
-        
-        # GREY ZONE GUARDRAIL: Never fast-path if the ML is highly confident it is an attack
-        grey_zone_limit = 0.85 
+
+        grey_zone_limit = 0.85
         is_below_grey_zone = fused_score < grey_zone_limit
 
-        # Only flag as a false positive (and thus allowlist the signature) when
-        # the fused score is well below the detection boundary — not just anywhere
-        # under the grey-zone ceiling.  A score that barely clears the ML threshold
-        # but still passes the trust check should be ALLOWed without being memorised,
-        # because its risk profile could easily flip on the next encounter.
-        LOW_RISK_CEILING = threshold * 0.75  # e.g. 0.558 at default threshold 0.7448
+        LOW_RISK_CEILING = threshold * 0.75
         is_genuinely_low_risk = fused_score < LOW_RISK_CEILING
 
         if is_trust_ok and is_below_grey_zone:
@@ -169,10 +163,6 @@ class ZeroTrustSOARAgent:
                     f"{self.trust_threshold}. No escalation required."
                 ),
                 "playbook": "ALLOW",
-                # Mark as FP (and allowlist) only when fused_risk is comfortably
-                # below the detection boundary.  Mid-range scores that happen to
-                # pass the trust check are allowed but NOT memorised — their risk
-                # profile is too ambiguous for a permanent fast-path exemption.
                 "is_false_positive": is_genuinely_low_risk,
                 "trust_eval": trust_eval.to_dict()
             }
@@ -183,13 +173,9 @@ class ZeroTrustSOARAgent:
                 print(f"[ZeroTrust]  Trust UNACCEPTABLE (< {self.trust_threshold}) → Response Agent")
 
             # ── Stage 4: Response Agent (LLM) ─────────────────────────
-            # FIX (Quarantine short-circuit): If this signature is already in
-            # active_quarantines, skip the LLM entirely — we already know it's
-            # malicious. This prevents hammering Ollama with repeat events for
-            # the same bad signature (a major source of LLM timeout errors).
             if trust_eval.behavior_signature in self.active_quarantines:
                 print(f"[ZeroTrust]  Signature '{trust_eval.behavior_signature}' already quarantined "
-                      f"→ NETWORK_ISOLATION (LLM skipped)")
+                        f"→ NETWORK_ISOLATION (LLM skipped)")
                 decision = {
                     "reasoning": (
                         f"Signature '{trust_eval.behavior_signature}' is in active quarantine. "
@@ -200,20 +186,21 @@ class ZeroTrustSOARAgent:
                     "is_llm_failsafe": False
                 }
             else:
-                decision = self.evaluate_incident(context, threshold)
+                # ── CHANGED: pass event_id through so evaluate_incident
+                #    can store the decision in vector memory after the LLM returns.
+                decision = self.evaluate_incident(context, threshold, event_id=event_id)
+
             decision["trust_eval"] = trust_eval.to_dict()
 
         # ── Stage 5: Execute SOAR Playbook ────────────────────────────
-        # FIX 4: Pass trust_eval into execute_playbook for full audit logging.
         self.execute_playbook(event_id, decision, telemetry, trust_eval)
 
         # ── Stage 6: Update Trust Score + Feedback Loop ───────────────
         self.update_trust_score(trust_eval)
-        # FIX 2: Pass trust_eval so feedback loop reuses the pre-computed
-        # signature instead of recomputing it from raw telemetry.
         self._trigger_feedback_loop(decision, trust_eval)
 
         return decision
+
 
     # ------------------------------------------------------------------
     # RCF gate helpers
@@ -354,36 +341,35 @@ class ZeroTrustSOARAgent:
     # Response Agent (LLM)
     # ------------------------------------------------------------------
 
-    def evaluate_incident(self, context: dict, optimal_threshold: float) -> dict:
+    def evaluate_incident(
+        self,
+        context: dict,
+        optimal_threshold: float,
+        event_id=None,               # ── CHANGED: added so we can store the decision
+    ) -> dict:
         """
         LLM-based Response Agent (DeepSeek-R1 via Ollama).
         Only called when PolicyAgent deems trust unacceptable.
         """
         mfa_trigger = optimal_threshold
-        # Isolation fires only when fused_risk is materially above the detection
-        # boundary — not just barely over it.  A 0.15 offset means a score of
-        # 0.89+ (at default threshold 0.7448) triggers full containment; scores
-        # between the threshold and 0.89 go to STEP_UP_AUTH unless the threat
-        # class is explicitly non-Normal/non-DoS.
         isolation_trigger = min(optimal_threshold + 0.15, 0.90)
-
+ 
         raw_rules = self.playbooks.get("routing_rules", [])
-
+ 
         # Only send the pre-defined native string rules to the LLM.
         # Learned dict rules (LEARNED_NNN / FN_PATCH_NNN) are managed by
         # PlaybookEditorAgent.consolidate_rules() and must not pollute the
         # response-agent prompt with pre-consolidation noise.
         native_rules = [r for r in raw_rules if isinstance(r, str)]
-
-        # Inject the dynamic thresholds into the strings
+ 
         formatted_rules = []
         for rule in native_rules:
             formatted_rule = rule.replace("{mfa_trigger}", f"{mfa_trigger:.4f}")
             formatted_rule = formatted_rule.replace("{isolation_trigger}", f"{isolation_trigger:.4f}")
             formatted_rules.append(formatted_rule)
-            
+ 
         rules_text = "\n        ".join(formatted_rules)
-
+ 
         # ── Slim context — only the fields the rules actually reference ──────
         telemetry = context.get("network_telemetry", {})
         ml = context.get("ml_risk_profile", {})
@@ -397,13 +383,34 @@ class ZeroTrustSOARAgent:
             "spkts":        telemetry.get("spkts"),
             "dpkts":        telemetry.get("dpkts"),
         }
-
+ 
+        # ── Vector enrichment: inject at most 2 highly-similar learned rules ──
+        # These are the AI-synthesised dict rules that evaluate_incident
+        # deliberately excludes from the native_rules list above.  Rather than
+        # sending ALL of them (unbounded bloat), we retrieve only the 2 most
+        # semantically similar to this specific event, and only if they clear a
+        # tight cosine-distance ceiling (< 0.65).  This means the LLM sees
+        # learned rules only when they are genuinely relevant — never as noise.
+        learned_rules_ctx = ""
+        if getattr(self, "vector_memory", None):
+            relevant = self.vector_memory.get_relevant_rules(context, n_results=2)
+            close_matches = [r for r in relevant if r["distance"] < 0.65]
+            if close_matches:
+                print(f"[VectorMemory] Injecting {len(close_matches)} learned rule(s) into prompt")
+                learned_rules_ctx = (
+                    "\nLEARNED RULES "
+                    "(AI-synthesised — apply ONLY if no native rule above matches):\n"
+                    + "\n".join(f"  - {r['document'][:180]}" for r in close_matches)
+                    + "\n"          # explicit trailing newline so EXAMPLES doesn't run on
+                )
+ 
         system_prompt = (
             "You are a SOC analyst. Apply the rules below in order — first match wins. "
             "Output ONLY a JSON object, no markdown, no preamble\n\n"
             "RULES:\n"
-            f"{rules_text}\n\n"
-            "EXAMPLES:\n"
+            f"{rules_text}\n"
+            f"{learned_rules_ctx}"  # empty string when no close matches → zero overhead
+            "\nEXAMPLES:\n"
             '{"fused_risk":0.85,"threat_class":"Reconnaissance","proto":"udp","state":"INT","spkts":250,"dpkts":0} '
             '-> {"reasoning":"Unidirectional UDP scan, zero response — confirmed recon. Rule 5.","playbook":"NETWORK_ISOLATION","is_false_positive":false}\n'
             '{"fused_risk":0.82,"threat_class":"Normal","proto":"tcp","state":"FIN","spkts":4,"dpkts":4} '
@@ -411,9 +418,9 @@ class ZeroTrustSOARAgent:
             "OUTPUT (return exactly this structure, nothing else):\n"
             '{"reasoning":"<1-2 sentences>","playbook":"ALLOW|STEP_UP_AUTH|NETWORK_ISOLATION|RATE_LIMIT_DOS","is_false_positive":true|false}'
         )
-
+ 
         user_prompt = json.dumps(slim_context, cls=_NumpyEncoder)
-
+ 
         url = "http://localhost:11434/api/generate"
         payload = {
             "model": "deepseek-r1:8b",
@@ -425,28 +432,39 @@ class ZeroTrustSOARAgent:
                 "num_predict": 3072,
             }
         }
-
+ 
         try:
             response = requests.post(url, json=payload, timeout=240)
             response.raise_for_status()
             raw_text = response.json()["response"]
-
-            # DEBUG — remove once stable; shows first 300 chars so you can see if
-            # the model is still overflowing its think chain or outputting garbage
+ 
             print(f"[DEBUG] LLM raw ({len(raw_text)} chars): {raw_text[:300]!r}")
-
-            # 1. Strip think tags (even if the model got cut off and forgot the closing tag)
+ 
+            # 1. Strip think tags (even if the model got cut off mid-chain)
             cleaned = re.sub(r"<think>.*?(?:</think>|$)", "", raw_text, flags=re.DOTALL).strip()
-            
+ 
             # 2. Aggressively hunt for the JSON object in whatever text is left
             json_match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
             if json_match:
                 cleaned = json_match.group(0)
             else:
                 raise ValueError("No JSON object found in LLM output.")
-
-            return json.loads(cleaned)
-        
+ 
+            parsed = json.loads(cleaned)
+ 
+            # ── CHANGED: store decision in vector memory for future retrieval ──
+            # Skipped for fail-safe responses (those carry no genuine signal).
+            # Uses event_id from the caller; falls back to context if not passed.
+            if getattr(self, "vector_memory", None):
+                _eid = event_id if event_id is not None else context.get("event_id", "unknown")
+                self.vector_memory.store_incident_summary(
+                    event_id=_eid,
+                    context=context,
+                    decision=parsed,
+                )
+ 
+            return parsed
+ 
         except requests.exceptions.Timeout:
             print(f"[ERROR] LLM Network Timeout: Ollama did not respond within 240 seconds.")
             return {
@@ -455,9 +473,8 @@ class ZeroTrustSOARAgent:
                 "is_false_positive": False,
                 "is_llm_failsafe": True
             }
-
+ 
         except ValueError as e:
-            # Model hit num_predict cap inside <think> and produced no JSON
             print(f"[ERROR] LLM JSON Parse Failed: {e} — model likely exhausted token budget in <think> chain.")
             return {
                 "reasoning": "Fail-safe: model output no parseable JSON (think-chain overflow).",
@@ -465,7 +482,7 @@ class ZeroTrustSOARAgent:
                 "is_false_positive": False,
                 "is_llm_failsafe": True
             }
-
+ 
         except Exception as e:
             print(f"[ERROR] LLM Evaluation Failed (unexpected): {type(e).__name__}: {e}")
             return {
@@ -474,6 +491,7 @@ class ZeroTrustSOARAgent:
                 "is_false_positive": False,
                 "is_llm_failsafe": True
             }
+
 
     # ------------------------------------------------------------------
     # Playbook execution

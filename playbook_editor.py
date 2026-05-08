@@ -6,6 +6,7 @@ import requests
 from typing import Optional
 import numpy as np
 
+from vector_memory import VectorMemory
 # ---------------------------------------------------------------------------
 # Correction record — persisted to correction_log.json
 # ---------------------------------------------------------------------------
@@ -74,7 +75,8 @@ class PlaybookEditorAgent:
         soar_agent,
         correction_log_file: str = "correction_log.json",
         ollama_model: str = "deepseek-r1:8b",
-        ollama_url: str = "http://localhost:11434/api/generate"
+        ollama_url: str = "http://localhost:11434/api/generate",
+        vector_memory=None,
     ):
         self.soar_agent          = soar_agent
         self.correction_log_file = correction_log_file
@@ -88,6 +90,10 @@ class PlaybookEditorAgent:
         # FN_THRESHOLD are flagged for human review.
         self.rule_health_file = "rule_health.json"
         self.rule_health: dict = self._load_rule_health()
+        self.vector_memory = (
+        vector_memory
+        or getattr(soar_agent, "vector_memory", None)
+    )  
 
     # ------------------------------------------------------------------
     # Public API
@@ -181,6 +187,11 @@ class PlaybookEditorAgent:
         )
         self.correction_log.append(record.to_dict())
         self._save_correction_log()
+        if self.vector_memory and record:
+            self.vector_memory.store_correction_analysis(record, correction_type="FN")
+            if new_rule:
+                self.vector_memory.store_synthesized_rule(new_rule, event_id, "FN")
+
 
         print(f"\n[PlaybookEditorAgent] \u2713 FN Self-Healing complete. Signature '{sig}' moved to quarantine.")
         print(f"{'='*60}\n")
@@ -276,6 +287,10 @@ class PlaybookEditorAgent:
         )
         self.correction_log.append(record.to_dict())
         self._save_correction_log()
+        if self.vector_memory and record:
+            self.vector_memory.store_correction_analysis(record, correction_type="FP")
+            if new_rule:
+                self.vector_memory.store_synthesized_rule(new_rule, event_id, "FP")
 
         print(f"\n[PlaybookEditorAgent] ✓ Self-Healing complete. "
               f"Playbooks updated. Signature '{sig}' added to allowlist.")
@@ -437,8 +452,17 @@ Consider:
 
 Output ONLY plain text — no JSON, no markdown, no preamble.
 """
+        prior_ctx = ""
+        if self.vector_memory:
+            prior = self.vector_memory.get_similar_corrections(context, n_results=2)
+            close = [r for r in prior if r["distance"] < 0.70]
+            if close:
+                prior_ctx = "SIMILAR PAST CORRECTIONS FOR REFERENCE:\n"
+                prior_ctx += "\n".join(f"  - {r['document'][:200]}" for r in close)
+                prior_ctx += "\n\n"
 
         user_prompt = (
+            f"{prior_ctx}"
             f"AI decision   : {decision.get('playbook')}\n"
             f"AI reasoning  : {decision.get('reasoning', 'none')}\n"
             f"ML profile    : {json.dumps(ml_profile)}\n"
@@ -473,7 +497,17 @@ Consider:
 
 Output ONLY plain text — no JSON, no markdown, no preamble.
 """
+        prior_ctx = ""
+        if self.vector_memory:
+            prior = self.vector_memory.get_similar_corrections(context, n_results=2)
+            close = [r for r in prior if r["distance"] < 0.70]
+            if close:
+                prior_ctx = "SIMILAR PAST CORRECTIONS FOR REFERENCE:\n"
+                prior_ctx += "\n".join(f"  - {r['document'][:200]}" for r in close)
+                prior_ctx += "\n\n"
+
         user_prompt = (
+            f"{prior_ctx}"
             f"AI decision   : {decision.get('playbook')}\n"
             f"AI reasoning  : {decision.get('reasoning', 'none')}\n"
             f"ML profile    : {json.dumps(ml_profile)}\n"

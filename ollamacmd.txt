@@ -1,0 +1,6 @@
+$env:OLLAMA_KEEP_ALIVE="-1" 
+$env:OLLAMA_DEBUG="1"
+ollama serve
+
+separately:
+ollama run deepseek-r1:8b
