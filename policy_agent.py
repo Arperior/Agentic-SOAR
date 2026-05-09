@@ -206,7 +206,8 @@ class PolicyAgent:
         telemetry = context.get("network_telemetry", {})
         ml_profile = context.get("ml_risk_profile", {})
         threat_type = context.get("predicted_threat_classification", "UNKNOWN")
-        behavior_signature = self._get_signature(telemetry, threat_type)
+        rb, ab, vb, eb = self._compute_buckets(ml_profile, telemetry)
+        behavior_signature = self._get_signature(telemetry, threat_type,risk_bucket=rb,anomaly_bucket=ab,volume_bucket=vb,entropy_bucket=eb)
         event_timestamp = context.get("timestamp", datetime.datetime.now().isoformat())
         score = 1.0   # start at full trust; factors penalize downward
         factors: list[TrustFactor] = []
@@ -349,29 +350,49 @@ class PolicyAgent:
     def _apply_memory_signals(
         self, score: float, factors: list, sig: str, memory: dict
     ) -> tuple:
-        quarantines = set(memory.get("active_quarantines", []))
-        allowlist = set(memory.get("dynamic_allowlist", []))
+        quarantines  = set(memory.get("active_quarantines", []))
+        allowlist    = set(memory.get("dynamic_allowlist",  []))
+        sig_data     = memory.get("signatures", {}).get(sig, {})
+        status       = sig_data.get("status", "unknown")
+        trust_bias   = sig_data.get("trust_bias", 0.0)
+        n            = sig_data.get("confirmed_normal", 0)
+        a            = sig_data.get("confirmed_attack", 0)
 
-        if sig in quarantines:
+        if sig in quarantines or status == "quarantined":
             penalty = self.config["quarantine_penalty"]
             factors.append(TrustFactor(
                 name="quarantine_history",
                 delta=-penalty,
-                reason=f"signature '{sig}' is in active_quarantines"
+                reason=f"signature '{sig}' is quarantined (n={n}, a={a})"
             ))
             score -= penalty
 
-        elif sig in allowlist:
+        elif sig in allowlist or status == "allowlisted":
             bonus = self.config["allowlist_bonus"]
             factors.append(TrustFactor(
                 name="allowlist_bonus",
                 delta=+bonus,
-                reason=f"signature '{sig}' was previously verified as benign (FP)"
+                reason=f"signature '{sig}' is allowlisted (n={n}, a={a})"
             ))
             score += bonus
 
-        return score, factors
+        elif trust_bias != 0.0:
+            # Monitoring: apply soft continuous bias from accumulated evidence.
+            # This is the main difference from the old binary system —
+            # a signature with 2 normals and 1 attack gets a mild positive
+            # nudge (+0.05) rather than no signal at all.
+            factors.append(TrustFactor(
+                name="evidence_bias",
+                delta=trust_bias,
+                reason=(
+                    f"signature '{sig}' monitoring: "
+                    f"bias={trust_bias:+.3f} (normal={n}, attack={a})"
+                )
+            ))
+            score += trust_bias
 
+        return score, factors
+    
     def _apply_proto_service_policy(
         self, score: float, factors: list, violations: list, telemetry: dict
     ) -> tuple:
@@ -459,10 +480,66 @@ class PolicyAgent:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-
     @staticmethod
-    def _get_signature(telemetry: dict, threat_class: str = "unknown") -> str:
-        proto = telemetry.get("proto", "unknown")
+    def _compute_buckets(ml_profile: dict, telemetry: dict) -> tuple[str, str, str, str]:
+        """
+        Returns (risk_bucket, anomaly_bucket, volume_bucket, entropy_bucket)
+        each as a single digit string R1-R4, A1-A3, V1-V3, E1-E3.
+        """
+        fused   = ml_profile.get("fused_risk", 0.0)
+        anomaly = ml_profile.get("anomaly_risk", 0.0)
+        spkts   = int(telemetry.get("spkts", 0))
+        entropy = ml_profile.get("incident_entropy", 0.0)
+
+        # Risk bucket: R1=low, R2=medium, R3=high, R4=critical
+        if fused < 0.40:
+            rb = "R1"
+        elif fused < 0.65:
+            rb = "R2"
+        elif fused < 0.85:
+            rb = "R3"
+        else:
+            rb = "R4"
+
+        # Anomaly bucket: A1=low, A2=medium, A3=high
+        if anomaly < 0.40:
+            ab = "A1"
+        elif anomaly < 0.70:
+            ab = "A2"
+        else:
+            ab = "A3"
+
+        # Volume bucket: V1=low, V2=medium, V3=high
+        if spkts < 100:
+            vb = "V1"
+        elif spkts < 5000:
+            vb = "V2"
+        else:
+            vb = "V3"
+
+        # Entropy bucket: E1=certain, E2=moderate, E3=uncertain
+        if entropy < 0.5:
+            eb = "E1"
+        elif entropy < 1.5:
+            eb = "E2"
+        else:
+            eb = "E3"
+
+        return rb, ab, vb, eb
+    
+    @staticmethod
+    def _get_signature(
+        telemetry: dict,
+        threat_class: str = "unknown",
+        risk_bucket: str = "R0",
+        anomaly_bucket: str = "A0",
+        volume_bucket: str = "V0",
+        entropy_bucket: str = "E0",
+    ) -> str:
+        proto   = telemetry.get("proto",   "unknown")
         service = telemetry.get("service", "unknown")
-        state = telemetry.get("state", "unknown")
-        return f"{proto}_{service}_{state}_{threat_class}"
+        state   = telemetry.get("state",   "unknown")
+        return (
+            f"{proto}_{service}_{state}_{threat_class}"
+            f"_{risk_bucket}_{anomaly_bucket}_{volume_bucket}_{entropy_bucket}"
+        )

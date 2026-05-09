@@ -5,8 +5,11 @@ import os
 import requests
 from typing import Optional
 import numpy as np
+import warnings
 
 from vector_memory import VectorMemory
+from utils import _buckets_to_semantic
+
 # ---------------------------------------------------------------------------
 # Correction record — persisted to correction_log.json
 # ---------------------------------------------------------------------------
@@ -139,9 +142,20 @@ class PlaybookEditorAgent:
 
         telemetry       = context.get("network_telemetry", {})
         trust_eval_dict = decision.get("trust_eval") or {}
-        sig = trust_eval_dict.get("behavior_signature") or self._derive_signature(
-            telemetry, threat_class=context.get("predicted_threat_classification", "unknown")
-        )
+        sig = trust_eval_dict.get("behavior_signature")
+        if not sig:
+            import warnings
+            warnings.warn(
+                f"[PlaybookEditorAgent] autonomous_fn_correction: trust_eval missing "
+                f"for event {event_id} — falling back to _derive_signature(). "
+                f"Ledger key may not match PolicyAgent's bucketed signature.",
+                stacklevel=2
+            )
+            sig = self._derive_signature(
+                telemetry,
+                threat_class=context.get("predicted_threat_classification", "unknown"),
+                ml_profile=context.get("ml_risk_profile", {}),
+            )
 
         print(f"  Behaviour sig: {sig}")
 
@@ -247,11 +261,22 @@ class PlaybookEditorAgent:
         print(f"  Ground Truth: NORMAL (False Positive Detected)")
 
         # ── Step 1: Extract the behaviour signature ───────────────────
-        telemetry  = context.get("network_telemetry", {})
+        telemetry = context.get("network_telemetry", {})
         trust_eval_dict = decision.get("trust_eval") or {}
-        sig = trust_eval_dict.get("behavior_signature") or self._derive_signature(
-            telemetry, threat_class=context.get("predicted_threat_classification", "unknown")
-        )
+        sig = trust_eval_dict.get("behavior_signature")
+        if not sig:
+            import warnings
+            warnings.warn(
+                f"[PlaybookEditorAgent] autonomous_fp_correction: trust_eval missing "
+                f"for event {event_id} — falling back to _derive_signature(). "
+                f"Ledger key may not match PolicyAgent's bucketed signature.",
+                stacklevel=2
+            )
+            sig = self._derive_signature(
+                telemetry,
+                threat_class=context.get("predicted_threat_classification", "unknown"),
+                ml_profile=context.get("ml_risk_profile", {}),
+            )
 
         print(f"  Behaviour sig: {sig}")
 
@@ -461,11 +486,41 @@ Output ONLY plain text — no JSON, no markdown, no preamble.
                 prior_ctx += "\n".join(f"  - {r['document'][:200]}" for r in close)
                 prior_ctx += "\n\n"
 
+        trust_eval_dict = decision.get("trust_eval") or {}
+        sig = trust_eval_dict.get("behavior_signature")
+        if not sig:
+            warnings.warn(
+                "[PlaybookEditorAgent] _analyse_mistake: trust_eval missing — "
+                "falling back to _derive_signature(). "
+                "Ledger key may not match PolicyAgent's bucketed signature.",
+                stacklevel=2
+            )
+            sig = self._derive_signature(
+                context.get("network_telemetry", {}),
+                threat_class=context.get("predicted_threat_classification", "unknown"),
+                ml_profile=context.get("ml_risk_profile", {}),
+            )
+        evidence_ctx = ""
+        if hasattr(self.soar_agent, '_format_evidence_summary'):
+            evidence_ctx = self.soar_agent._format_evidence_summary(sig)
+        evidence_block = f"{evidence_ctx}\n\n" if evidence_ctx else ""
+
+        semantic = _buckets_to_semantic({
+            **ml_profile,
+            "spkts_approx": telemetry.get("spkts", 0)
+        })
+
         user_prompt = (
             f"{prior_ctx}"
+            f"{evidence_block}"
             f"AI decision   : {decision.get('playbook')}\n"
             f"AI reasoning  : {decision.get('reasoning', 'none')}\n"
             f"ML profile    : {json.dumps(ml_profile)}\n"
+            f"Risk context  :\n"                                                                
+            f"  - Fused risk severity       : {semantic['fused_risk_severity']}\n"              
+            f"  - Anomaly severity          : {semantic['anomaly_severity']}\n"                 
+            f"  - Traffic volume            : {semantic['traffic_volume']}\n"                   
+            f"  - Classification certainty  : {semantic['classification_certainty']}\n"
             f"Trust factors : {json.dumps(trust_factors)}\n"
             f"Telemetry     : {json.dumps({k: telemetry.get(k) for k in ['proto','service','state','spkts','dpkts']})}\n"
             f"Threat class  : {context.get('predicted_threat_classification')}\n\n"
@@ -506,11 +561,41 @@ Output ONLY plain text — no JSON, no markdown, no preamble.
                 prior_ctx += "\n".join(f"  - {r['document'][:200]}" for r in close)
                 prior_ctx += "\n\n"
 
+        trust_eval_dict = decision.get("trust_eval") or {}
+        sig = trust_eval_dict.get("behavior_signature")
+        if not sig:
+            warnings.warn(
+                "[PlaybookEditorAgent] _analyse_fn_mistake: trust_eval missing — "
+                "falling back to _derive_signature(). "
+                "Ledger key may not match PolicyAgent's bucketed signature.",
+                stacklevel=2
+            )
+            sig = self._derive_signature(
+                context.get("network_telemetry", {}),
+                threat_class=context.get("predicted_threat_classification", "unknown"),
+                ml_profile=context.get("ml_risk_profile", {}),
+            )
+        evidence_ctx = ""
+        if hasattr(self.soar_agent, '_format_evidence_summary'):
+            evidence_ctx = self.soar_agent._format_evidence_summary(sig)
+        evidence_block = f"{evidence_ctx}\n\n" if evidence_ctx else ""
+
+        semantic = _buckets_to_semantic({
+            **ml_profile,
+            "spkts_approx": telemetry.get("spkts", 0)
+        })
+
         user_prompt = (
             f"{prior_ctx}"
+            f"{evidence_block}"
             f"AI decision   : {decision.get('playbook')}\n"
             f"AI reasoning  : {decision.get('reasoning', 'none')}\n"
             f"ML profile    : {json.dumps(ml_profile)}\n"
+            f"Risk context  :\n"
+            f"  - Fused risk severity       : {semantic['fused_risk_severity']}\n"
+            f"  - Anomaly severity          : {semantic['anomaly_severity']}\n"
+            f"  - Traffic volume            : {semantic['traffic_volume']}\n"
+            f"  - Classification certainty  : {semantic['classification_certainty']}\n"
             f"Trust factors : {json.dumps(trust_factors)}\n"
             f"Telemetry     : {json.dumps({k: telemetry.get(k) for k in ['proto','service','state','spkts','dpkts']})}\n"
             f"Threat class  : {context.get('predicted_threat_classification')}\n\n"
@@ -529,6 +614,33 @@ Output ONLY plain text — no JSON, no markdown, no preamble.
         telemetry   = context.get("network_telemetry", {})
         ml_profile  = context.get("ml_risk_profile", {})
         threat_type = context.get("predicted_threat_classification", "UNKNOWN")
+
+        trust_eval_dict = decision.get("trust_eval") or {}
+        sig = trust_eval_dict.get("behavior_signature")
+        if not sig:
+            import warnings
+            warnings.warn(
+                "[PlaybookEditorAgent] _synthesise_fn_rule: trust_eval missing — "
+                "falling back to _derive_signature(). "
+                "Ledger key may not match PolicyAgent's bucketed signature.",
+                stacklevel=2
+            )
+            sig = self._derive_signature(
+                telemetry,
+                threat_class=threat_type,
+                ml_profile=context.get("ml_risk_profile", {}),
+            )
+
+        evidence_ctx = ""
+        if hasattr(self.soar_agent, '_format_evidence_summary'):
+            evidence_ctx = self.soar_agent._format_evidence_summary(sig)
+            
+        evidence_block = f"BEHAVIORAL HISTORY:\n{evidence_ctx}\n\n" if evidence_ctx else ""
+
+        semantic = _buckets_to_semantic({
+            **ml_profile,
+            "spkts_approx": telemetry.get("spkts", 0)
+        })
 
         existing_rules = self.soar_agent.playbooks.get("routing_rules", [])
         learned_count  = sum(
@@ -559,7 +671,13 @@ RULES:
         user_prompt = (
             f"Rule ID to assign : {rule_id}\n"
             f"Root-cause analysis:\n{analysis}\n\n"
+            f"{evidence_block}"
             f"ML profile        : {json.dumps(ml_profile)}\n"
+            f"Risk context  :\n"                                                                
+            f"  - Fused risk severity       : {semantic['fused_risk_severity']}\n"              
+            f"  - Anomaly severity          : {semantic['anomaly_severity']}\n"                 
+            f"  - Traffic volume            : {semantic['traffic_volume']}\n"                   
+            f"  - Classification certainty  : {semantic['classification_certainty']}\n"
             f"Threat class      : {threat_type}\n"
             f"Key telemetry     : proto={telemetry.get('proto')}, service={telemetry.get('service')}, "
             f"state={telemetry.get('state')}, spkts={telemetry.get('spkts')}, dpkts={telemetry.get('dpkts')}\n\n"
@@ -612,6 +730,33 @@ RULES:
         ml_profile  = context.get("ml_risk_profile", {})
         threat_type = context.get("predicted_threat_classification", "UNKNOWN")
 
+        trust_eval_dict = decision.get("trust_eval") or {}
+        sig = trust_eval_dict.get("behavior_signature")
+        if not sig:
+            import warnings
+            warnings.warn(
+                "[PlaybookEditorAgent] _synthesise_rule: trust_eval missing — "
+                "falling back to _derive_signature(). "
+                "Ledger key may not match PolicyAgent's bucketed signature.",
+                stacklevel=2
+            )
+            sig = self._derive_signature(
+                telemetry,
+                threat_class=threat_type,
+                ml_profile=context.get("ml_risk_profile", {}),
+            )
+        
+        evidence_ctx = ""
+        if hasattr(self.soar_agent, '_format_evidence_summary'):
+            evidence_ctx = self.soar_agent._format_evidence_summary(sig)
+            
+        evidence_block = f"BEHAVIORAL HISTORY:\n{evidence_ctx}\n\n" if evidence_ctx else ""
+
+        semantic = _buckets_to_semantic({
+            **ml_profile,
+            "spkts_approx": telemetry.get("spkts", 0)
+        })
+
         existing_rules = self.soar_agent.playbooks.get("routing_rules", [])
         learned_count  = sum(
             1 for r in existing_rules
@@ -642,7 +787,13 @@ RULES:
         user_prompt = (
             f"Rule ID to assign : {rule_id}\n"
             f"Root-cause analysis:\n{analysis}\n\n"
+            f"{evidence_block}"
             f"ML profile        : {json.dumps(ml_profile)}\n"
+            f"Risk context  :\n"                                                                
+            f"  - Fused risk severity       : {semantic['fused_risk_severity']}\n"              
+            f"  - Anomaly severity          : {semantic['anomaly_severity']}\n"                 
+            f"  - Traffic volume            : {semantic['traffic_volume']}\n"                   
+            f"  - Classification certainty  : {semantic['classification_certainty']}\n"
             f"Threat class      : {threat_type}\n"
             f"Key telemetry     : proto={telemetry.get('proto')}, service={telemetry.get('service')}, "
             f"state={telemetry.get('state')}, spkts={telemetry.get('spkts')}, dpkts={telemetry.get('dpkts')}\n\n"
@@ -704,20 +855,16 @@ RULES:
             raw = response.json().get("response", "")
             return re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
         except requests.exceptions.Timeout:
-            print(f"[ERROR] LLM Evaluation Timeout: Ollama did not respond within 240 seconds.")
-            return {"reasoning": "Fail-safe: network timeout.", "playbook": "NETWORK_ISOLATION",
-                    "is_false_positive": False, "is_llm_failsafe": True}
+            print("[ERROR] PlaybookEditorAgent LLM timeout — Ollama did not respond within 240s.")
+            return None
 
         except ValueError as e:
-            # JSON parse failure — model generated think chain but no valid JSON
-            print(f"[ERROR] LLM JSON Parse Failed: {e}")
-            return {"reasoning": "Fail-safe: model output no parseable JSON (likely think-chain overflow).",
-                    "playbook": "NETWORK_ISOLATION", "is_false_positive": False, "is_llm_failsafe": True}
+            print(f"[ERROR] PlaybookEditorAgent LLM parse error: {e}")
+            return None
 
         except Exception as e:
-            print(f"[ERROR] LLM Evaluation Failed (unexpected): {e}")
-            return {"reasoning": "Fail-safe: unexpected LLM error.", "playbook": "NETWORK_ISOLATION",
-                    "is_false_positive": False, "is_llm_failsafe": True}
+            print(f"[ERROR] PlaybookEditorAgent LLM unexpected error: {type(e).__name__}: {e}")
+            return None
 
     # ------------------------------------------------------------------
     # Playbook I/O
@@ -822,6 +969,22 @@ OUTPUT FORMAT:
             self._save_playbooks(playbooks)
             print(f"[PlaybookEditorAgent] Consolidation complete: {len(learned)} rules → {len(consolidated)} rules.")
 
+            # ── Sync vector memory with the new consolidated rule set ──
+            # Delete embeddings for pre-consolidation rules, then re-store
+            # the consolidated set so get_relevant_rules() never returns
+            # a rule that no longer exists in playbooks.json.
+            if self.vector_memory:
+                for old_rule in learned:
+                    self.vector_memory.delete_rule(old_rule.get("id", ""))
+                for new_rule in consolidated:
+                    if isinstance(new_rule, dict):
+                        self.vector_memory.store_synthesized_rule(
+                            new_rule,
+                            event_id="consolidation",
+                            correction_type="merged",
+                        )
+                print(f"[VectorMemory] Synced: {len(learned)} old embeddings removed, "
+                      f"{len(consolidated)} consolidated rules stored.")
         except (json.JSONDecodeError, ValueError) as exc:
             print(f"[PlaybookEditorAgent] Consolidation parse error: {exc} — existing rules unchanged.")
 
@@ -930,41 +1093,65 @@ OUTPUT FORMAT:
     # ------------------------------------------------------------------
 
     def _register_allowlist(self, sig: str):
-        if sig not in self.soar_agent.dynamic_allowlist:
-            self.soar_agent.dynamic_allowlist.add(sig)
-            self.soar_agent.active_quarantines.discard(sig)
-            self.soar_agent._save_memory()
-            print(f"[PlaybookEditorAgent] '{sig}' added to dynamic_allowlist (removed from quarantine if present).")
-
+        # Routes through the evidence ledger.
+        # Promotion to allowlisted happens only after ALLOW_THRESHOLD
+        # confirmed normals with zero attacks — not immediately.
+        self.soar_agent.update_signature_evidence(sig, verdict="normal")
 
     def _register_quarantine(self, sig: str):
-        """
-        Moves a signature to active_quarantines and strips it from the allowlist.
-        Called after a confirmed False Negative to harden future routing.
-        """
-        if sig in self.soar_agent.dynamic_allowlist:
-            self.soar_agent.dynamic_allowlist.discard(sig)
-            print(f"[PlaybookEditorAgent] \u26a0 '{sig}' REMOVED from dynamic_allowlist (confirmed missed attack).")
-        if sig not in self.soar_agent.active_quarantines:
-            self.soar_agent.active_quarantines.add(sig)
-            self.soar_agent._save_memory()
-            print(f"[PlaybookEditorAgent] '{sig}' added to active_quarantines.")
+        # Routes through the evidence ledger.
+        # A single confirmed FN lowers trust_bias but does not immediately
+        # quarantine — that requires QUARANTINE_THRESHOLD attack verdicts
+        # with zero normals.
+        self.soar_agent.update_signature_evidence(sig, verdict="attack")
 
     @staticmethod
-    def _derive_signature(telemetry: dict, threat_class: str = "unknown") -> str:
+    def _derive_signature(
+        telemetry: dict,
+        threat_class: str = "unknown",
+        ml_profile: dict = None,
+    ) -> str:
         """
-        Produces a behaviour signature used as the memory key for allowlist/quarantine.
+        Fallback signature builder used only when trust_eval is absent from
+        the decision dict.  Mirrors PolicyAgent._get_signature() exactly so
+        ledger keys are always in the same bucketed format:
+          proto_service_state_threatclass_RX_AX_VX_EX
 
-        threat_class is included to prevent ping-pong: without it, genuinely distinct
-        traffic (e.g. a benign FIN teardown vs a Fuzzer attack) collapses to the same
-        key (tcp_-_FIN), causing allowlist/quarantine to flip-flop on the same signature.
-        Including threat_class means tcp_-_FIN_Normal and tcp_-_FIN_Fuzzers are tracked
-        independently, so a patch rule for one never contaminates the other.
+        ml_profile is optional for backward compatibility.  When absent,
+        buckets default to R0/A0/V0/E0 — the key won't match any live entry
+        but will at least not silently collide with a real one.
         """
         proto   = telemetry.get("proto",   "unknown")
         service = telemetry.get("service", "unknown")
         state   = telemetry.get("state",   "unknown")
-        return f"{proto}_{service}_{state}_{threat_class}"
+
+        if ml_profile:
+            fused   = ml_profile.get("fused_risk",       0.0)
+            anomaly = ml_profile.get("anomaly_risk",     0.0)
+            entropy = ml_profile.get("incident_entropy", 0.0)
+            spkts   = int(telemetry.get("spkts", 0))
+
+            # ── Mirror PolicyAgent._compute_buckets exactly ──────────
+            if fused < 0.40:   rb = "R1"
+            elif fused < 0.65: rb = "R2"
+            elif fused < 0.85: rb = "R3"
+            else:              rb = "R4"
+
+            if anomaly < 0.40:   ab = "A1"
+            elif anomaly < 0.70: ab = "A2"
+            else:                ab = "A3"
+
+            if spkts < 100:    vb = "V1"
+            elif spkts < 5000: vb = "V2"
+            else:              vb = "V3"
+
+            if entropy < 0.5:   eb = "E1"
+            elif entropy < 1.5: eb = "E2"
+            else:               eb = "E3"
+        else:
+            rb, ab, vb, eb = "R0", "A0", "V0", "E0"
+
+        return f"{proto}_{service}_{state}_{threat_class}_{rb}_{ab}_{vb}_{eb}"
 
     # ------------------------------------------------------------------
     # Rule health I/O

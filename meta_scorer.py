@@ -40,10 +40,10 @@ class CostSensitiveMetaLearner:
 
     def _validate_input(self, X):
         """Ensures the input matrix perfectly matches the pipeline expectations."""
-        if X.shape[1] != 3:
+        if X.shape[1] != 4:
             raise ValueError(
-                f"[ERROR] Meta-Learner expects exactly 3 features "
-                f"(CatBoost prob, RCF score, Incident entropy). Received: {X.shape[1]}"
+                f"[ERROR] Meta-Learner expects exactly 4 features "
+                f"(CatBoost prob, RCF score, Incident entropy, Top-2 margin). Received: {X.shape[1]}"
             )
 
     def fit(self, X, y):
@@ -160,6 +160,14 @@ def _incident_entropy(incident_proba: np.ndarray) -> np.ndarray:
     p = np.clip(p_norm, 1e-12, 1.0)
     return -np.sum(p * np.log(p), axis=1)
 
+def _top2_margin(incident_proba: np.ndarray) -> np.ndarray:
+    """
+    Returns top1_prob - top2_prob for each sample.
+    High margin → agent is very confident about one class (low ambiguity).
+    Low margin  → agent is split between two classes (high ambiguity).
+    """
+    sorted_probs = np.sort(incident_proba, axis=1)[:, ::-1]  # descending
+    return sorted_probs[:, 0] - sorted_probs[:, 1]
 
 def train_fusion_meta_learner(X_train_meta, y_train, COST_FN=10, COST_FP=2, lambda_reg=0.1):
     print(f"\nTraining Meta-Learner (FN Penalty: {COST_FN}, FP Penalty: {COST_FP}, L2: {lambda_reg})...")
@@ -178,7 +186,7 @@ def train_fusion_meta_learner(X_train_meta, y_train, COST_FN=10, COST_FP=2, lamb
     print(
         f"\nMeta-Learner weights — "
         f"CatBoost: {w[0]:.4f}  RCF: {w[1]:.4f}  Entropy: {w[2]:.4f}  "
-        f"Bias: {meta_model.bias:.4f}"
+        f"Top2Margin: {w[3]:.4f}  Bias: {meta_model.bias:.4f}"
     )
     # Warn if CatBoost weight drops below 30% of total absolute weight, which
     # would indicate the precision floor is suppressing the primary classifier.

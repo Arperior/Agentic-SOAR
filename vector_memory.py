@@ -416,16 +416,38 @@ class VectorMemory:
 
         return "\n".join(parts)
 
-    # ──────────────────────────────────────────────────────────────────────
-    # STATS  —  for diagnostics
-    # ──────────────────────────────────────────────────────────────────────
-
     def stats(self) -> dict:
         return {
             "correction_analyses": self._col_corrections.count(),
             "incident_summaries":  self._col_incidents.count(),
             "synthesized_rules":   self._col_rules.count(),
         }
+
+    def delete_rule(self, rule_id: str) -> None:
+        """
+        Removes a synthesized rule embedding from ChromaDB by its rule_id
+        (e.g. 'LEARNED_001', 'FN_PATCH_002').
+
+        Called by PlaybookEditorAgent.consolidate_rules() after merging
+        rules so stale embeddings never get injected into LLM prompts.
+        Safe to call on a rule_id that doesn't exist — the except block
+        silently ignores the miss rather than crashing consolidation.
+
+        Parameters
+        ----------
+        rule_id : str
+            The rule's id field as written by PlaybookEditorAgent,
+            e.g. 'LEARNED_001'. Internally converted to the stable
+            ChromaDB document ID using the same hash used at store time.
+        """
+        doc_id = _stable_id("rule", rule_id)
+        try:
+            self._col_rules.delete(ids=[doc_id])
+            print(f"[VectorMemory] Deleted rule embedding '{rule_id}' → {doc_id}")
+        except Exception:
+            # Rule was never stored, already deleted, or ChromaDB miss —
+            # all are safe to ignore during consolidation.
+            pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────

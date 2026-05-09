@@ -7,6 +7,7 @@ import numpy as np
 
 from policy_agent import PolicyAgent, TrustEvaluation
 from vector_memory import VectorMemory
+from utils import _buckets_to_semantic
 
 
 class _NumpyEncoder(json.JSONEncoder):
@@ -49,13 +50,15 @@ class ZeroTrustSOARAgent:
             default_data={
                 "dynamic_allowlist": [],
                 "active_quarantines": [],
-                "trust_scores": {}
+                "trust_scores": {},
+                "signatures": {} 
             }
         )
 
         self.dynamic_allowlist = set(self.memory.get("dynamic_allowlist", []))
         self.active_quarantines = set(self.memory.get("active_quarantines", []))
         self.trust_scores: dict = self.memory.get("trust_scores", {})
+        self.signatures:   dict = self.memory.get("signatures", {})
 
         # Policy Agent — deterministic Zero Trust evaluation layer
         self.policy_agent = PolicyAgent(policy_config_file=policy_config_file)
@@ -135,7 +138,8 @@ class ZeroTrustSOARAgent:
         # ── Stage 2: Policy Agent ──────────────────────────────────────
         memory_snapshot = {
             "active_quarantines": self.active_quarantines,
-            "dynamic_allowlist": self.dynamic_allowlist
+            "dynamic_allowlist": self.dynamic_allowlist,
+            "signatures": self.signatures
         }
         trust_eval = self.policy_agent.evaluate(context, memory_snapshot)
 
@@ -188,7 +192,7 @@ class ZeroTrustSOARAgent:
             else:
                 # ── CHANGED: pass event_id through so evaluate_incident
                 #    can store the decision in vector memory after the LLM returns.
-                decision = self.evaluate_incident(context, threshold, event_id=event_id)
+                decision = self.evaluate_incident(context, threshold, event_id=event_id,behavior_sig=trust_eval.behavior_signature)
 
             decision["trust_eval"] = trust_eval.to_dict()
 
@@ -197,7 +201,7 @@ class ZeroTrustSOARAgent:
 
         # ── Stage 6: Update Trust Score + Feedback Loop ───────────────
         self.update_trust_score(trust_eval)
-        self._trigger_feedback_loop(decision, trust_eval)
+        self._trigger_feedback_loop(decision, trust_eval,fused_score)
 
         return decision
 
@@ -242,10 +246,145 @@ class ZeroTrustSOARAgent:
                 {
                     "dynamic_allowlist": list(self.dynamic_allowlist),
                     "active_quarantines": list(self.active_quarantines),
-                    "trust_scores": self.trust_scores
+                    "trust_scores": self.trust_scores,
+                    "signatures": self.signatures 
                 },
                 f, indent=4
             )
+
+    def update_signature_evidence(self, sig: str, verdict: str, confidence: float = 1.0):
+        """
+        Records one ground-truth observation for a behaviour signature
+        and adjusts its trust bias accordingly.
+
+        Parameters
+        ----------
+        sig     : str   — behaviour signature (proto_service_state_threatclass)
+        verdict : str   — "normal" or "attack"
+        confidence : float in [0.0, 1.0]
+            Scales how much this single event moves the trust_bias and counters.
+            1.0 = full weight (default, preserves backward compatibility).
+            Values below 0.5 are typical for borderline events near the threshold.
+
+        Promotion rules
+        ───────────────
+        confirmed_normal >= ALLOW_THRESHOLD  AND confirmed_attack == 0
+            → status = "allowlisted"  (added to dynamic_allowlist set)
+
+        confirmed_attack >= QUARANTINE_THRESHOLD  AND confirmed_normal == 0
+            → status = "quarantined"  (added to active_quarantines set)
+
+        Mixed evidence
+            → status stays "monitoring"; trust_bias nudges ±BIAS_STEP
+              and is applied as a soft factor in PolicyAgent.evaluate()
+
+        Demotion rules (prevent permanent lock-in)
+        ───────────────
+        allowlisted  AND confirmed_attack reaches 2  → back to monitoring
+        quarantined  AND confirmed_normal reaches 3  → back to monitoring
+        """
+        confidence = float(np.clip(confidence, 0.05, 1.0))
+
+        ALLOW_THRESHOLD      = 3      # clean normals needed to allowlist
+        QUARANTINE_THRESHOLD = 2      # confirmed attacks needed to quarantine
+        BIAS_STEP            = 0.05 * confidence  # per-event soft trust adjustment
+
+        entry = self.signatures.setdefault(sig, {
+            "confirmed_normal": 0.0,
+            "confirmed_attack": 0.0,
+            "trust_bias":       0.0,
+            "status":           "monitoring",
+            "last_updated":     ""
+        })
+
+        # ── Already graduated — increment counter and check for demotion ──
+        if entry["status"] in ("allowlisted", "quarantined"):
+            key = "confirmed_normal" if verdict == "normal" else "confirmed_attack"
+            entry[key] += confidence
+
+            if entry["status"] == "allowlisted" and entry["confirmed_attack"] >= 2:
+                entry["status"]     = "monitoring"
+                entry["trust_bias"] = 0.0
+                self.dynamic_allowlist.discard(sig)
+                print(f"[EvidenceLedger] '{sig}' DEMOTED allowlist→monitoring "
+                      f"(counter-evidence: {entry['confirmed_attack']} attacks)")
+
+            elif entry["status"] == "quarantined" and entry["confirmed_normal"] >= 3:
+                entry["status"]     = "monitoring"
+                entry["trust_bias"] = 0.0
+                self.active_quarantines.discard(sig)
+                print(f"[EvidenceLedger] '{sig}' DEMOTED quarantine→monitoring "
+                      f"(counter-evidence: {entry['confirmed_normal']} normals)")
+
+            entry["last_updated"] = datetime.datetime.now().isoformat()
+            self._save_memory()
+            return
+
+        # ── Still monitoring — accumulate evidence ────────────────────────
+        if verdict == "normal":
+            entry["confirmed_normal"] += confidence
+            entry["trust_bias"] = min(entry["trust_bias"] + BIAS_STEP, 0.20)
+        else:
+            entry["confirmed_attack"] += confidence
+            entry["trust_bias"] = max(entry["trust_bias"] - BIAS_STEP, -0.30)
+
+        n = entry["confirmed_normal"]
+        a = entry["confirmed_attack"]
+
+        # ── Promotion check ───────────────────────────────────────────────
+        if n >= ALLOW_THRESHOLD and a < 0.5:
+            entry["status"]     = "allowlisted"
+            entry["trust_bias"] = self.policy_agent.config["allowlist_bonus"]
+            self.dynamic_allowlist.add(sig)
+            self.active_quarantines.discard(sig)
+            print(f"[EvidenceLedger] '{sig}' PROMOTED → allowlisted "
+                  f"after {n:.2f} confirmed normals, {a:.2f} attacks")
+
+        elif a >= QUARANTINE_THRESHOLD and n < 0.5:
+            entry["status"]     = "quarantined"
+            entry["trust_bias"] = -self.policy_agent.config["quarantine_penalty"]
+            self.active_quarantines.add(sig)
+            self.dynamic_allowlist.discard(sig)
+            print(f"[EvidenceLedger] '{sig}' PROMOTED → quarantined "
+                  f"after {a:.2f} confirmed attacks, {n:.2f} normals")
+
+        else:
+            print(f"[EvidenceLedger] '{sig}' monitoring: "
+                  f"bias={entry['trust_bias']:+.3f} (normal={n}, attack={a})")
+
+        entry["last_updated"] = datetime.datetime.now().isoformat()
+        self._save_memory()
+
+    def _format_evidence_summary(self, sig: str) -> str:
+        """
+        Produces a short plain-text summary of the historical evidence for sig.
+        Returns an empty string if the signature has no history.
+        """
+        entry = self.signatures.get(sig)
+        if not entry:
+            return ""
+
+        n       = entry.get("confirmed_normal", 0)
+        a       = entry.get("confirmed_attack", 0)
+        status  = entry.get("status", "monitoring")
+        bias    = entry.get("trust_bias", 0.0)
+        total   = n + a
+
+        lines = [
+            "Historical evidence for this behavior signature:",
+            f"  - Seen {int(total)} time(s) total",
+            f"  - {int(n)} confirmed benign, {int(a)} confirmed malicious",
+            f"  - Current status  : {status}",
+            f"  - Trust bias      : {bias:+.3f}",
+        ]
+        if status == "allowlisted":
+            lines.append("  - Note: signature was previously allowlisted (established benign pattern)")
+        elif status == "quarantined":
+            lines.append("  - Note: signature is quarantined (prior confirmed attacks)")
+        elif a > 0 and n > 0:
+            lines.append("  - Note: mixed evidence — treat with elevated scrutiny")
+
+        return "\n".join(lines)
 
     def _get_default_playbooks(self):
         return {
@@ -323,15 +462,17 @@ class ZeroTrustSOARAgent:
             return obj.tolist()
         return obj
 
-    def construct_context(self, event_id, cat_risk, rcf_risk, final_risk, threat_type, telemetry):
+    def construct_context(self, event_id, cat_risk, rcf_risk, final_risk,
+                          threat_type, telemetry, incident_entropy=0.0): # <-- Added parameter
         raw_telemetry = telemetry.to_dict() if hasattr(telemetry, "to_dict") else dict(telemetry)
         return {
             "event_id": int(event_id) if hasattr(event_id, 'item') else event_id,
             "timestamp": datetime.datetime.now().isoformat(),
             "ml_risk_profile": {
-                "categorical_risk": round(float(cat_risk), 3),
-                "anomaly_risk":     round(float(rcf_risk), 3),
-                "fused_risk":       round(float(final_risk), 3)
+                "categorical_risk":  round(float(cat_risk), 3),
+                "anomaly_risk":      round(float(rcf_risk), 3),
+                "fused_risk":        round(float(final_risk), 3),
+                "incident_entropy":  round(float(incident_entropy), 4), # <-- Added to profile
             },
             "predicted_threat_classification": str(threat_type),
             "network_telemetry": self._sanitize_for_json(raw_telemetry)
@@ -346,6 +487,7 @@ class ZeroTrustSOARAgent:
         context: dict,
         optimal_threshold: float,
         event_id=None,               # ── CHANGED: added so we can store the decision
+        behavior_sig: str = None,
     ) -> dict:
         """
         LLM-based Response Agent (DeepSeek-R1 via Ollama).
@@ -373,6 +515,10 @@ class ZeroTrustSOARAgent:
         # ── Slim context — only the fields the rules actually reference ──────
         telemetry = context.get("network_telemetry", {})
         ml = context.get("ml_risk_profile", {})
+        semantic = _buckets_to_semantic({
+            **ml,
+            "spkts_approx": telemetry.get("spkts", 0)
+        })
         slim_context = {
             "fused_risk":   ml.get("fused_risk"),
             "cat_risk":     ml.get("categorical_risk"),
@@ -382,6 +528,10 @@ class ZeroTrustSOARAgent:
             "state":        telemetry.get("state"),
             "spkts":        telemetry.get("spkts"),
             "dpkts":        telemetry.get("dpkts"),
+            "fused_risk_severity":      semantic["fused_risk_severity"],
+            "anomaly_severity":         semantic["anomaly_severity"],
+            "traffic_volume":           semantic["traffic_volume"],
+            "classification_certainty": semantic["classification_certainty"],
         }
  
         # ── Vector enrichment: inject at most 2 highly-similar learned rules ──
@@ -403,13 +553,17 @@ class ZeroTrustSOARAgent:
                     + "\n".join(f"  - {r['document'][:180]}" for r in close_matches)
                     + "\n"          # explicit trailing newline so EXAMPLES doesn't run on
                 )
+        evidence_ctx = ""
+        if behavior_sig:
+            evidence_ctx = self._format_evidence_summary(behavior_sig)
  
         system_prompt = (
             "You are a SOC analyst. Apply the rules below in order — first match wins. "
             "Output ONLY a JSON object, no markdown, no preamble\n\n"
-            "RULES:\n"
+            + (f"BEHAVIORAL HISTORY:\n{evidence_ctx}\n\n" if evidence_ctx else "")
+            + "RULES:\n"
             f"{rules_text}\n"
-            f"{learned_rules_ctx}"  # empty string when no close matches → zero overhead
+            f"{learned_rules_ctx}"
             "\nEXAMPLES:\n"
             '{"fused_risk":0.85,"threat_class":"Reconnaissance","proto":"udp","state":"INT","spkts":250,"dpkts":0} '
             '-> {"reasoning":"Unidirectional UDP scan, zero response — confirmed recon. Rule 5.","playbook":"NETWORK_ISOLATION","is_false_positive":false}\n'
@@ -560,7 +714,7 @@ class ZeroTrustSOARAgent:
     # Feedback loop
     # ------------------------------------------------------------------
 
-    def _trigger_feedback_loop(self, decision: dict, trust_eval: TrustEvaluation):
+    def _trigger_feedback_loop(self, decision: dict, trust_eval: TrustEvaluation, fused_risk: float = 0.5):
         """
         Updates allowlist / quarantine based on the final playbook decision.
 
@@ -573,37 +727,24 @@ class ZeroTrustSOARAgent:
         is_fp = decision.get("is_false_positive", False)
 
         if playbook_name == "ALLOW" and is_fp:
-            self._add_to_allowlist(trust_eval)
+            self._add_to_allowlist(trust_eval,fused_risk)
         elif playbook_name in ["NETWORK_ISOLATION", "RATE_LIMIT_DOS"]:
-            self._add_to_quarantine(trust_eval)
+            self._add_to_quarantine(trust_eval,fused_risk)
 
-    def _add_to_allowlist(self, trust_eval: TrustEvaluation):
-        """FIX 2: Uses pre-computed signature from TrustEvaluation.
-        FIX (Mutual exclusivity): Never allowlist a signature that is currently
-        quarantined — quarantine always wins. The PlaybookEditorAgent's
-        _register_quarantine is the only path that can move a sig from quarantine
-        to allowlist, and only after explicit FP confirmation."""
-        sig = trust_eval.behavior_signature
-        if sig in self.active_quarantines:
-            print(f"       [MEMORY] '{sig}' is quarantined — allowlist add skipped (quarantine takes precedence).")
-            return
-        if sig not in self.dynamic_allowlist:
-            print(f"       [MEMORY] Adding '{sig}' to Allowlist")
-            self.dynamic_allowlist.add(sig)
-            self._save_memory()
+    def _add_to_allowlist(self, trust_eval: TrustEvaluation, fused_risk: float = 0.5):
+        # Lower confidence when the event is dangerously close to the decision boundary
+        confidence = 1.0 - abs(fused_risk - self.optimal_threshold) * 2
+        confidence = float(np.clip(confidence, 0.1, 1.0))
+        self.update_signature_evidence(
+            trust_eval.behavior_signature, verdict="normal", confidence=confidence
+        )
 
-    def _add_to_quarantine(self, trust_eval: TrustEvaluation):
-        """FIX 2: Uses pre-computed signature from TrustEvaluation.
-        FIX (Mutual exclusivity): Strips the signature from the dynamic allowlist
-        before adding to quarantine so the two sets are always disjoint."""
-        sig = trust_eval.behavior_signature
-        if sig in self.dynamic_allowlist:
-            print(f"       [MEMORY] Removing '{sig}' from Allowlist (confirmed attack — quarantine overrides)")
-            self.dynamic_allowlist.discard(sig)
-        if sig not in self.active_quarantines:
-            print(f"       [MEMORY] Adding '{sig}' to Quarantine")
-            self.active_quarantines.add(sig)
-            self._save_memory()
+    def _add_to_quarantine(self, trust_eval: TrustEvaluation, fused_risk: float = 0.9):
+        # Higher fused_risk directly equals higher confidence for attacks
+        confidence = float(np.clip(fused_risk, 0.1, 1.0))
+        self.update_signature_evidence(
+            trust_eval.behavior_signature, verdict="attack", confidence=confidence
+        )
 
     # kept for backward compatibility
     def update_feedback_loop(self, action: str, trust_eval: TrustEvaluation):

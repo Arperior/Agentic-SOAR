@@ -7,13 +7,15 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import StratifiedKFold
 import joblib
-from meta_scorer import _incident_entropy
+from meta_scorer import _incident_entropy, _top2_margin
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.model_selection import train_test_split
 
 
 def train_categorical_model(X_cat, y, cat_cols):
     print("\nTraining CatBoost (with High Regularization)...")
     cb_model = CatBoostClassifier(
-        iterations=100,
+        iterations=300,
         learning_rate=0.1,
         depth=6,
         cat_features=cat_cols,
@@ -27,17 +29,47 @@ def train_categorical_model(X_cat, y, cat_cols):
 def train_incident_agent(X_cat, y_multi, cat_cols):
     print("\nTraining Incident Agent (Multi-class Threat Classifier)...")
     incident_model = CatBoostClassifier(
-        iterations=100,
-        learning_rate=0.1,
+        iterations=500,           # was 100 — more trees for rare-class recall
+        learning_rate=0.03,       # was 0.1  — slower learning, better generalisation
         depth=6,
         loss_function='MultiClass',
+        eval_metric='TotalF1',    # optimise for macro F1 across all attack classes
         cat_features=cat_cols,
-        l2_leaf_reg=15,
+        l2_leaf_reg=30,           # was 15 — stronger regularisation
+        min_data_in_leaf=20,      # prevents overfitting on rare-class leaves
         auto_class_weights='Balanced',
+        random_strength=1.5,      # adds stochasticity to reduce variance
+        bagging_temperature=0.8,
         verbose=False
     )
     incident_model.fit(X_cat, y_multi)
     return incident_model
+
+def calibrate_incident_agent(incident_model, X_cal, y_cal_multi):
+    """
+    Wraps a trained CatBoost multi-class model with isotonic regression
+    calibration fitted on a held-out calibration set.
+
+    Parameters
+    ----------
+    incident_model : trained CatBoostClassifier (MultiClass)
+    X_cal          : pd.DataFrame — categorical features of the calibration split
+    y_cal_multi    : pd.Series   — multi-class labels of the calibration split
+
+    Returns
+    -------
+    calibrated_model — a sklearn CalibratedClassifierCV wrapper whose
+                       predict_proba() outputs are calibrated probabilities.
+    """
+    print("\nCalibrating Incident Agent probabilities (isotonic regression)...")
+    calibrated = CalibratedClassifierCV(
+        estimator=incident_model,
+        method='isotonic',
+        cv='prefit'          # model is already trained; only fit the calibrator
+    )
+    calibrated.fit(X_cal, y_cal_multi)
+    print("Calibration complete.")
+    return calibrated
 
 
 def _fit_num_pipeline(X_num_raw_tr):
@@ -96,6 +128,7 @@ def generate_oof_features(
     oof_cat = np.zeros(len(y))
     oof_rcf = np.zeros(len(y))
     oof_incident_entropy = np.zeros(len(y))
+    oof_top2_margin = np.zeros(len(y))
 
     # Reset indices for safe iloc slicing
     X_cat_reset = X_cat.reset_index(drop=True)
@@ -137,18 +170,23 @@ def generate_oof_features(
         # 3. Incident agent entropy (multiclass uncertainty)
         if train_incident_func is not None:
             y_multi_tr = y_multi_reset.iloc[train_idx]
-            temp_incident = train_incident_func(X_cat_tr, y_multi_tr, cat_cols)
+
+            # Inner split: 80% train the model, 20% fit the calibrator
+            X_cat_tr_inner, X_cat_cal, y_multi_inner, y_multi_cal = train_test_split(
+                X_cat_tr, y_multi_tr, test_size=0.20, random_state=42,
+                stratify=y_multi_tr
+            )
+            temp_incident = train_incident_func(X_cat_tr_inner, y_multi_inner, cat_cols)
+            temp_incident = calibrate_incident_agent(temp_incident, X_cat_cal, y_multi_cal)
+
             incident_proba_val = temp_incident.predict_proba(X_cat_val)
-            
-            # FIX (Section 2, Issue 1): Use the centralized entropy function
             oof_incident_entropy[val_idx] = _incident_entropy(incident_proba_val)
-            p = np.clip(incident_proba_val, 1e-12, 1.0)
-            oof_incident_entropy[val_idx] = -np.sum(p * np.log(p), axis=1)
+            oof_top2_margin[val_idx] = _top2_margin(incident_proba_val)
 
         fold += 1
 
     print("OOF Generation Complete.")
-    return oof_cat, oof_rcf, oof_incident_entropy
+    return oof_cat, oof_rcf, oof_incident_entropy, oof_top2_margin
 
 
 def prepare_datasets(file_path, is_train=False):
@@ -347,3 +385,41 @@ def validate_results(y_true, final_risk, catboost_model, categorical_cols,
     sorted_importance = sorted(importance_dict.items(), key=lambda x: x[1], reverse=True)
     for feature, importance in sorted_importance[:5]:
         print(f" - {feature}: {importance:.2f}% influence")
+
+def _buckets_to_semantic(ml_profile: dict) -> dict:
+    """
+    Converts numeric ML scores and bucket codes into human-readable
+    severity labels for LLM prompt injection.
+    """
+    fused   = ml_profile.get("fused_risk", 0.0)
+    anomaly = ml_profile.get("anomaly_risk", 0.0)
+    spkts   = ml_profile.get("spkts_approx", 0)      
+    entropy = ml_profile.get("incident_entropy", 0.0)
+
+    def risk_label(v):
+        if v < 0.40: return "LOW"
+        if v < 0.65: return "MEDIUM"
+        if v < 0.85: return "HIGH"
+        return "CRITICAL"
+
+    def anomaly_label(v):
+        if v < 0.40: return "LOW"
+        if v < 0.70: return "MEDIUM"
+        return "HIGH"
+
+    def volume_label(n):
+        if n < 100:  return "LOW"
+        if n < 5000: return "MEDIUM"
+        return "HIGH"
+
+    def entropy_label(v):
+        if v < 0.5:  return "HIGH (certain)"
+        if v < 1.5:  return "MEDIUM"
+        return "LOW (uncertain)"
+
+    return {
+        "fused_risk_severity":        risk_label(fused),
+        "anomaly_severity":           anomaly_label(anomaly),
+        "traffic_volume":             volume_label(spkts),
+        "classification_certainty":   entropy_label(entropy),
+    }
