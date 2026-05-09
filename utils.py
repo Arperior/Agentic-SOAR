@@ -15,8 +15,8 @@ from sklearn.model_selection import train_test_split
 def train_categorical_model(X_cat, y, cat_cols):
     print("\nTraining CatBoost (with High Regularization)...")
     cb_model = CatBoostClassifier(
-        iterations=300,
-        learning_rate=0.1,
+        iterations=500,
+        learning_rate=0.05,
         depth=6,
         cat_features=cat_cols,
         l2_leaf_reg=15,
@@ -160,7 +160,7 @@ def generate_oof_features(
         oof_cat[val_idx] = temp_cat.predict_proba(X_cat_val)[:, 1]
 
         # 2. RCF anomaly score (trained on normal traffic only)
-        temp_rcf = rcf_class(num_trees=40, tree_size=256)
+        temp_rcf = rcf_class(num_trees=100, tree_size=256)
         X_num_tr_normal = X_num_tr[y_tr.values == 0]
         
         # FIX: Pass the global anchors into the temporary fold's fit_predict
