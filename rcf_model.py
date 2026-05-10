@@ -133,7 +133,7 @@ class RCF:
         else:
             self._score_p1   = float(np.percentile(raw_array, 1))
             self._score_p99  = float(np.percentile(raw_array, 99))
-            self._score_p995 = float(np.percentile(raw_array, 99.5))
+            self._score_p995 = float(np.percentile(raw_array, 99.9))
 
         print(
             f"[RCF] Calibration anchors — "
