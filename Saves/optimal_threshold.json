@@ -1,17 +1,17 @@
 {
-    "optimal_threshold": 0.78007007007007,
-    "soc_cost": 42078,
+    "optimal_threshold": 0.7888988988988989,
+    "soc_cost": 37532,
     "is_fallback": false,
     "cost_fn": 12,
     "cost_fp": 2,
     "min_precision": 0.75,
-    "min_recall": 0.8,
-    "achieved_precision": 0.7504915254237288,
-    "achieved_recall": 0.976771375628695,
+    "min_recall": 0.83,
+    "achieved_precision": 0.7504240775264104,
+    "achieved_recall": 0.9856392835083385,
     "confusion": {
-        "tn": 22279,
-        "fp": 14721,
-        "fn": 1053,
-        "tp": 44279
+        "tn": 22140,
+        "fp": 14860,
+        "fn": 651,
+        "tp": 44681
     }
 }
