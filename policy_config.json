@@ -4,16 +4,16 @@
     "ml_risk_weight": 0.3,
     "threat_class_penalties": {
         "Normal": 0.0,
-        "Generic": 0.2,
+        "Generic": 0.4,
         "Exploits": 0.3,
-        "Fuzzers": 0.2,
+        "Fuzzers": 0.4,
         "DoS": 0.15,
-        "Reconnaissance": 0.25,
+        "Reconnaissance": 0.4,
         "Backdoor": 0.4,
         "Analysis": 0.15,
         "Shellcode": 0.45,
         "Worms": 0.4,
-        "UNKNOWN": 0.3
+        "UNKNOWN": 0.4
     },
     "quarantine_penalty": 0.4,
     "allowlist_bonus": 0.15,

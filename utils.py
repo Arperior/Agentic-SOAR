@@ -11,6 +11,23 @@ from meta_scorer import _incident_entropy, _top2_margin
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.model_selection import train_test_split
 
+def predict_with_normal_penalty(model, X, normal_penalty=0.15):
+    """
+    Applies a penalty to the Normal class probability before
+    taking argmax. Forces the model to be more confident about
+    Normal before assigning it, reducing FN rate on attacks.
+    """
+    proba = model.predict_proba(X)
+    classes = list(model.classes_)
+    normal_idx = classes.index("Normal")
+
+    adjusted = proba.copy()
+    adjusted[:, normal_idx] -= normal_penalty
+    adjusted = np.clip(adjusted, 0, None)   # no negatives
+
+    predicted_indices = np.argmax(adjusted, axis=1)
+    return np.array(classes)[predicted_indices]
+
 
 def train_categorical_model(X_cat, y, cat_cols):
     print("\nTraining CatBoost (with High Regularization)...")
@@ -30,14 +47,14 @@ def train_incident_agent(X_cat, y_multi, cat_cols):
     print("\nTraining Incident Agent (Multi-class Threat Classifier)...")
     incident_model = CatBoostClassifier(
         iterations=500,           # was 100 — more trees for rare-class recall
-        learning_rate=0.03,       # was 0.1  — slower learning, better generalisation
-        depth=6,
-        loss_function='MultiClass',
+        learning_rate=0.05,       # was 0.1  — slower learning, better generalisation
+        depth=6,                 
+        loss_function='MultiClassOneVsAll',
         eval_metric='TotalF1',    # optimise for macro F1 across all attack classes
         cat_features=cat_cols,
-        l2_leaf_reg=30,           # was 15 — stronger regularisation
+        l2_leaf_reg=15,           
         min_data_in_leaf=20,      # prevents overfitting on rare-class leaves
-        auto_class_weights='Balanced',
+        auto_class_weights='SqrtBalanced',
         random_strength=1.5,      # adds stochasticity to reduce variance
         bagging_temperature=0.8,
         verbose=False
@@ -49,17 +66,6 @@ def calibrate_incident_agent(incident_model, X_cal, y_cal_multi):
     """
     Wraps a trained CatBoost multi-class model with isotonic regression
     calibration fitted on a held-out calibration set.
-
-    Parameters
-    ----------
-    incident_model : trained CatBoostClassifier (MultiClass)
-    X_cal          : pd.DataFrame — categorical features of the calibration split
-    y_cal_multi    : pd.Series   — multi-class labels of the calibration split
-
-    Returns
-    -------
-    calibrated_model — a sklearn CalibratedClassifierCV wrapper whose
-                       predict_proba() outputs are calibrated probabilities.
     """
     print("\nCalibrating Incident Agent probabilities (isotonic regression)...")
     calibrated = CalibratedClassifierCV(

@@ -1,15 +1,16 @@
 [
     {
-        "event_id": 114886,
+        "event_id": 50606,
         "context": {
-            "event_id": 114886,
-            "timestamp": "2026-04-30T19:26:25.425849",
+            "event_id": 50606,
+            "timestamp": "2026-05-10T17:10:26.993918",
             "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.016,
-                "fused_risk": 0.814
+                "categorical_risk": 0.462,
+                "anomaly_risk": 0.877,
+                "fused_risk": 0.841,
+                "incident_entropy": 1.3663
             },
-            "predicted_threat_classification": "Fuzzers",
+            "predicted_threat_classification": "Normal",
             "network_telemetry": {
                 "ct_state_ttl": "1",
                 "is_ftp_login": "0",
@@ -17,314 +18,112 @@
                 "proto": "tcp",
                 "service": "-",
                 "state": "FIN",
-                "dur": 0.740634,
+                "dur": 2.060678,
                 "spkts": 10.0,
-                "dpkts": 6.0,
-                "sbytes": 756.0,
-                "dbytes": 268.0,
-                "rate": 20.252918,
+                "dpkts": 8.0,
+                "sbytes": 564.0,
+                "dbytes": 354.0,
+                "rate": 8.249712,
                 "sttl": 254.0,
                 "dttl": 252.0,
-                "sload": 7355.859863,
-                "dload": 2419.548584,
+                "sload": 1972.166382,
+                "dload": 1203.487427,
                 "sloss": 2.0,
                 "dloss": 1.0,
-                "sinpkt": 82.184778,
-                "dinpkt": 124.328,
-                "sjit": 4060.741085,
-                "djit": 181.015688,
+                "sinpkt": 224.221667,
+                "dinpkt": 281.742844,
+                "sjit": 13833.61675,
+                "djit": 429.766344,
                 "swin": 255.0,
-                "stcpb": 1449090643.0,
-                "dtcpb": 2651592986.0,
+                "stcpb": 2933338584.0,
+                "dtcpb": 4085545447.0,
                 "dwin": 255.0,
-                "tcprtt": 0.180202,
-                "synack": 0.118989,
-                "ackdat": 0.061213,
-                "smean": 76.0,
-                "dmean": 45.0,
+                "tcprtt": 0.16397,
+                "synack": 0.088467,
+                "ackdat": 0.075503,
+                "smean": 56.0,
+                "dmean": 44.0,
                 "trans_depth": 0.0,
                 "response_body_len": 0.0,
                 "ct_srv_src": 5.0,
-                "ct_dst_ltm": 2.0,
+                "ct_dst_ltm": 1.0,
                 "ct_src_dport_ltm": 1.0,
                 "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 4.0,
+                "ct_dst_src_ltm": 1.0,
                 "ct_ftp_cmd": 0.0,
                 "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 3.0,
-                "ct_srv_dst": 4.0
+                "ct_src_ltm": 1.0,
+                "ct_srv_dst": 1.0
             }
         },
         "ai_decision": {
-            "reasoning": "Trust score 0.5558 meets threshold 0.4. No escalation required.",
+            "reasoning": "Trust score 0.7477 meets threshold 0.4. No escalation required.",
             "playbook": "ALLOW",
             "is_false_positive": false,
             "trust_eval": {
-                "trust_score": 0.5558,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
+                "trust_score": 0.7477,
+                "behavior_signature": "tcp_-_FIN_Normal_R3_A3_V1_E2",
+                "threat_type": "Normal",
                 "factors": [
                     {
                         "name": "ml_fused_risk",
-                        "delta": -0.24419999999999997,
-                        "reason": "fused_risk=0.8140 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
+                        "delta": -0.25229999999999997,
+                        "reason": "fused_risk=0.8410 \u00d7 weight=0.30"
                     }
                 ],
                 "policy_violations": [],
                 "is_acceptable": true,
-                "evaluated_at": "2026-04-30T19:26:25.425849"
-            }
-        },
-        "new_rule": {
-            "id": "FN_PATCH_001",
-            "condition": "proto=tcp AND state=FIN AND threat_class=Fuzzers",
-            "playbook": "NETWORK_ISOLATION",
-            "is_fn": true,
-            "rationale": "Direct detection of Fuzzers with TCP FIN state to prevent missed attacks.",
-            "created_at": "2026-04-30T19:27:24.097390",
-            "source": "PlaybookEditorAgent"
-        },
-        "analysis": "The anomaly_risk was extremely low at 0.016, failing to flag the malicious activity despite the traffic features.  \nThe threat classification penalty for 'Fuzzers' reduced the risk score, allowing the system to rely on low anomaly detection.  \nA high trust score of 0.5558 met the threshold, overriding the low anomaly_risk and enabling the attack.",
-        "corrected_at": "2026-04-30T19:27:24.098196"
-    },
-    {
-        "event_id": 87885,
-        "context": {
-            "event_id": 87885,
-            "timestamp": "2026-04-30T19:27:24.099764",
-            "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.094,
-                "fused_risk": 0.823
-            },
-            "predicted_threat_classification": "Fuzzers",
-            "network_telemetry": {
-                "ct_state_ttl": "1",
-                "is_ftp_login": "0",
-                "is_sm_ips_ports": "0",
-                "proto": "tcp",
-                "service": "-",
-                "state": "FIN",
-                "dur": 1.139447,
-                "spkts": 10.0,
-                "dpkts": 8.0,
-                "sbytes": 2516.0,
-                "dbytes": 354.0,
-                "rate": 14.919518,
-                "sttl": 254.0,
-                "dttl": 252.0,
-                "sload": 15902.45117,
-                "dload": 2176.494385,
-                "sloss": 2.0,
-                "dloss": 1.0,
-                "sinpkt": 126.605222,
-                "dinpkt": 131.388281,
-                "sjit": 6969.361418,
-                "djit": 196.482234,
-                "swin": 255.0,
-                "stcpb": 1681014289.0,
-                "dtcpb": 1383390283.0,
-                "dwin": 255.0,
-                "tcprtt": 0.291566,
-                "synack": 0.121719,
-                "ackdat": 0.169847,
-                "smean": 252.0,
-                "dmean": 44.0,
-                "trans_depth": 0.0,
-                "response_body_len": 0.0,
-                "ct_srv_src": 3.0,
-                "ct_dst_ltm": 1.0,
-                "ct_src_dport_ltm": 1.0,
-                "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 4.0,
-                "ct_ftp_cmd": 0.0,
-                "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 2.0,
-                "ct_srv_dst": 3.0
-            }
-        },
-        "ai_decision": {
-            "reasoning": "Signature 'tcp_-_FIN' is in active quarantine. Immediate isolation without LLM re-evaluation.",
-            "playbook": "NETWORK_ISOLATION",
-            "is_false_positive": false,
-            "is_llm_failsafe": false,
-            "trust_eval": {
-                "trust_score": 0.1531,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
-                "factors": [
-                    {
-                        "name": "ml_fused_risk",
-                        "delta": -0.24689999999999998,
-                        "reason": "fused_risk=0.8230 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "quarantine_history",
-                        "delta": -0.4,
-                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
-                    }
-                ],
-                "policy_violations": [],
-                "is_acceptable": false,
-                "evaluated_at": "2026-04-30T19:27:24.099764"
+                "evaluated_at": "2026-05-10T17:10:26.993918"
             }
         },
         "new_rule": null,
-        "analysis": "The fused_risk was artificially elevated due to the misclassification of benign TCP traffic with FIN state as 'Fuzzers', despite low anomaly_risk, because the model associated FIN flags with fuzzing exploits in this context.\n\nThe threat_classification penalty from predicting 'Fuzzers' and the quarantine_history delta from the 'tcp_-_FIN' signature, which was incorrectly quarantined, contributed to a low trust score, triggering the isolation policy.\n\nThis represents a model hallucination where normal traffic patterns were misinterpreted as malicious fuzzing activity, likely due to overfitting on historical false positives or incomplete data.",
-        "corrected_at": "2026-04-30T19:29:04.266370"
+        "analysis": "The high trust score (0.7477) met the threshold (0.4), overriding the high anomaly_risk (0.877) and fused_risk (0.841), allowing the traffic despite attack indicators.\n\nThe telemetry features, including the \"FIN\" TCP state and low spkts/dpkts (10.0/8.0), disguised the attack by mimicking normal traffic patterns.\n\nThe threat classification as \"Normal\" likely contributed to the elevated trust score, bypassing detection mechanisms that should have flagged the attack.",
+        "corrected_at": "2026-05-10T17:12:29.952718"
     },
     {
-        "event_id": 88112,
+        "event_id": 53954,
         "context": {
-            "event_id": 88112,
-            "timestamp": "2026-04-30T19:30:27.150572",
+            "event_id": 53954,
+            "timestamp": "2026-05-10T17:15:03.731715",
             "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.05,
-                "fused_risk": 0.818
+                "categorical_risk": 0.45,
+                "anomaly_risk": 0.988,
+                "fused_risk": 0.813,
+                "incident_entropy": 1.1907
             },
-            "predicted_threat_classification": "Fuzzers",
+            "predicted_threat_classification": "Normal",
             "network_telemetry": {
-                "ct_state_ttl": "1",
+                "ct_state_ttl": "2",
                 "is_ftp_login": "0",
                 "is_sm_ips_ports": "0",
-                "proto": "tcp",
+                "proto": "udp",
                 "service": "-",
-                "state": "FIN",
-                "dur": 0.511158,
-                "spkts": 10.0,
-                "dpkts": 6.0,
-                "sbytes": 2516.0,
-                "dbytes": 268.0,
-                "rate": 29.345135,
+                "state": "INT",
+                "dur": 9e-06,
+                "spkts": 2.0,
+                "dpkts": 0.0,
+                "sbytes": 168.0,
+                "dbytes": 0.0,
+                "rate": 111111.1072,
                 "sttl": 254.0,
-                "dttl": 252.0,
-                "sload": 35448.92188,
-                "dload": 3505.765381,
-                "sloss": 2.0,
-                "dloss": 1.0,
-                "sinpkt": 55.136111,
-                "dinpkt": 81.515797,
-                "sjit": 2807.416837,
-                "djit": 124.36225,
-                "swin": 255.0,
-                "stcpb": 3114739265.0,
-                "dtcpb": 1570185020.0,
-                "dwin": 255.0,
-                "tcprtt": 0.186399,
-                "synack": 0.103571,
-                "ackdat": 0.082828,
-                "smean": 252.0,
-                "dmean": 45.0,
-                "trans_depth": 0.0,
-                "response_body_len": 0.0,
-                "ct_srv_src": 7.0,
-                "ct_dst_ltm": 1.0,
-                "ct_src_dport_ltm": 1.0,
-                "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 3.0,
-                "ct_ftp_cmd": 0.0,
-                "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 3.0,
-                "ct_srv_dst": 3.0
-            }
-        },
-        "ai_decision": {
-            "reasoning": "Signature 'tcp_-_FIN' is in active quarantine. Immediate isolation without LLM re-evaluation.",
-            "playbook": "NETWORK_ISOLATION",
-            "is_false_positive": false,
-            "is_llm_failsafe": false,
-            "trust_eval": {
-                "trust_score": 0.1546,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
-                "factors": [
-                    {
-                        "name": "ml_fused_risk",
-                        "delta": -0.24539999999999998,
-                        "reason": "fused_risk=0.8180 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "quarantine_history",
-                        "delta": -0.4,
-                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
-                    }
-                ],
-                "policy_violations": [],
-                "is_acceptable": false,
-                "evaluated_at": "2026-04-30T19:30:27.150572"
-            }
-        },
-        "new_rule": {
-            "id": "LEARNED_002",
-            "condition": "proto=tcp AND state=FIN",
-            "playbook": "ALLOW",
-            "is_fp": true,
-            "rationale": "Corrects false positive by allowing benign TCP FIN traffic with specific characteristics.",
-            "created_at": "2026-04-30T19:31:51.989864",
-            "source": "PlaybookEditorAgent"
-        },
-        "analysis": "The fused_risk signal was artificially inflated to 0.818, likely due to its high weight in the risk fusion policy, which artificially lowered the trust score below the threshold. The threat classification penalty for 'Fuzzers' and the quarantine history penalty for the 'tcp_-_FIN' signature further reduced trust, despite the benign traffic. The specific feature, TCP state 'FIN', was misclassified by the model, possibly due to a known over-sensitivity to FIN states in network traffic patterns.",
-        "corrected_at": "2026-04-30T19:31:51.992676"
-    },
-    {
-        "event_id": 80390,
-        "context": {
-            "event_id": 80390,
-            "timestamp": "2026-04-30T19:32:24.148490",
-            "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.062,
-                "fused_risk": 0.819
-            },
-            "predicted_threat_classification": "Fuzzers",
-            "network_telemetry": {
-                "ct_state_ttl": "1",
-                "is_ftp_login": "0",
-                "is_sm_ips_ports": "0",
-                "proto": "tcp",
-                "service": "-",
-                "state": "FIN",
-                "dur": 3.833387,
-                "spkts": 16.0,
-                "dpkts": 16.0,
-                "sbytes": 886.0,
-                "dbytes": 850.0,
-                "rate": 8.086844,
-                "sttl": 254.0,
-                "dttl": 252.0,
-                "sload": 1734.236694,
-                "dload": 1663.281128,
-                "sloss": 4.0,
-                "dloss": 4.0,
-                "sinpkt": 255.559146,
-                "dinpkt": 248.974797,
-                "sjit": 17750.64682,
-                "djit": 423.95275,
-                "swin": 255.0,
-                "stcpb": 2221620441.0,
-                "dtcpb": 3546004297.0,
-                "dwin": 255.0,
-                "tcprtt": 0.24628,
-                "synack": 0.098124,
-                "ackdat": 0.148156,
-                "smean": 55.0,
-                "dmean": 53.0,
+                "dttl": 0.0,
+                "sload": 74666664.0,
+                "dload": 0.0,
+                "sloss": 0.0,
+                "dloss": 0.0,
+                "sinpkt": 0.009,
+                "dinpkt": 0.0,
+                "sjit": 0.0,
+                "djit": 0.0,
+                "swin": 0.0,
+                "stcpb": 0.0,
+                "dtcpb": 0.0,
+                "dwin": 0.0,
+                "tcprtt": 0.0,
+                "synack": 0.0,
+                "ackdat": 0.0,
+                "smean": 84.0,
+                "dmean": 0.0,
                 "trans_depth": 0.0,
                 "response_body_len": 0.0,
                 "ct_srv_src": 1.0,
@@ -339,58 +138,49 @@
             }
         },
         "ai_decision": {
-            "reasoning": "Trust score 0.7043 meets threshold 0.4. No escalation required.",
+            "reasoning": "Trust score 0.7561 meets threshold 0.4. No escalation required.",
             "playbook": "ALLOW",
             "is_false_positive": false,
             "trust_eval": {
-                "trust_score": 0.7043,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
+                "trust_score": 0.7561,
+                "behavior_signature": "udp_-_INT_Normal_R3_A3_V1_E2",
+                "threat_type": "Normal",
                 "factors": [
                     {
                         "name": "ml_fused_risk",
-                        "delta": -0.24569999999999997,
-                        "reason": "fused_risk=0.8190 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "allowlist_bonus",
-                        "delta": 0.15,
-                        "reason": "signature 'tcp_-_FIN' was previously verified as benign (FP)"
+                        "delta": -0.24389999999999998,
+                        "reason": "fused_risk=0.8130 \u00d7 weight=0.30"
                     }
                 ],
                 "policy_violations": [],
                 "is_acceptable": true,
-                "evaluated_at": "2026-04-30T19:32:24.148490"
+                "evaluated_at": "2026-05-10T17:15:03.731715"
             }
         },
         "new_rule": {
-            "id": "FN_PATCH_003",
-            "condition": "proto=tcp AND state=FIN AND spkts=16.0 AND dpkts=16.0",
+            "id": "FN_PATCH_001",
+            "condition": "proto=udp AND state=INT",
             "playbook": "NETWORK_ISOLATION",
             "is_fn": true,
-            "rationale": "Directly targets TCP FIN state with low packet counts to catch disguised fuzzing attacks.",
-            "created_at": "2026-04-30T19:34:09.090593",
+            "rationale": "Catches UDP traffic with INT state, similar to the missed attack.",
+            "created_at": "2026-05-10T17:16:43.174089",
             "source": "PlaybookEditorAgent"
         },
-        "analysis": "The allowlist bonus incorrectly elevated the trust score by 0.15, as the 'tcp_FIN' signature was previously mislabeled as benign, overriding the risk signals despite the attack.\n\nThe low anomaly_risk of 0.062 and threat classification penalty of -0.2 for 'Fuzzers' minimized the overall risk, allowing the system to accept the traffic.\n\nTraffic features, including tcp proto with FIN state and low spkts/dpkts, disguised the fuzzing attack by mimicking normal behavior, evading detection.",
-        "corrected_at": "2026-04-30T19:34:09.092131"
+        "analysis": "The high trust score (0.7561) exceeded the threshold (0.4), overriding the high anomaly_risk (0.988) and fused_risk (0.813) despite the attack indicators.  \nThe threat was misclassified as \"Normal\", enabling the fast-path allowance without escalation.  \nUDP traffic with low packet counts (spkts=2.0, dpkts=0.0) disguised the attack, reducing detection signals.",
+        "corrected_at": "2026-05-10T17:16:43.175942"
     },
     {
-        "event_id": 87856,
+        "event_id": 91066,
         "context": {
-            "event_id": 87856,
-            "timestamp": "2026-04-30T19:34:33.134799",
+            "event_id": 91066,
+            "timestamp": "2026-05-10T17:17:56.655533",
             "ml_risk_profile": {
-                "categorical_risk": 0.456,
-                "anomaly_risk": 0.401,
-                "fused_risk": 0.821
+                "categorical_risk": 0.45,
+                "anomaly_risk": 0.984,
+                "fused_risk": 0.813,
+                "incident_entropy": 1.1907
             },
-            "predicted_threat_classification": "Shellcode",
+            "predicted_threat_classification": "Normal",
             "network_telemetry": {
                 "ct_state_ttl": "2",
                 "is_ftp_login": "0",
@@ -398,19 +188,19 @@
                 "proto": "udp",
                 "service": "-",
                 "state": "INT",
-                "dur": 1e-05,
+                "dur": 6e-06,
                 "spkts": 2.0,
                 "dpkts": 0.0,
-                "sbytes": 1994.0,
+                "sbytes": 168.0,
                 "dbytes": 0.0,
-                "rate": 100000.0025,
+                "rate": 166666.6608,
                 "sttl": 254.0,
                 "dttl": 0.0,
-                "sload": 797600000.0,
+                "sload": 112000000.0,
                 "dload": 0.0,
                 "sloss": 0.0,
                 "dloss": 0.0,
-                "sinpkt": 0.01,
+                "sinpkt": 0.006,
                 "dinpkt": 0.0,
                 "sjit": 0.0,
                 "djit": 0.0,
@@ -421,112 +211,11 @@
                 "tcprtt": 0.0,
                 "synack": 0.0,
                 "ackdat": 0.0,
-                "smean": 997.0,
+                "smean": 84.0,
                 "dmean": 0.0,
                 "trans_depth": 0.0,
                 "response_body_len": 0.0,
-                "ct_srv_src": 7.0,
-                "ct_dst_ltm": 2.0,
-                "ct_src_dport_ltm": 2.0,
-                "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 7.0,
-                "ct_ftp_cmd": 0.0,
-                "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 2.0,
-                "ct_srv_dst": 7.0
-            }
-        },
-        "ai_decision": {
-            "reasoning": "Signature 'udp_-_INT' is in active quarantine. Immediate isolation without LLM re-evaluation.",
-            "playbook": "NETWORK_ISOLATION",
-            "is_false_positive": false,
-            "is_llm_failsafe": false,
-            "trust_eval": {
-                "trust_score": 0.0,
-                "behavior_signature": "udp_-_INT",
-                "threat_type": "Shellcode",
-                "factors": [
-                    {
-                        "name": "ml_fused_risk",
-                        "delta": -0.24629999999999996,
-                        "reason": "fused_risk=0.8210 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.45,
-                        "reason": "predicted_threat='Shellcode' \u2192 penalty=0.45"
-                    },
-                    {
-                        "name": "quarantine_history",
-                        "delta": -0.4,
-                        "reason": "signature 'udp_-_INT' is in active_quarantines"
-                    }
-                ],
-                "policy_violations": [
-                    "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold"
-                ],
-                "is_acceptable": false,
-                "evaluated_at": "2026-04-30T19:34:33.134799"
-            }
-        },
-        "new_rule": {
-            "id": "LEARNED_004",
-            "condition": "proto=udp AND state=INT",
-            "playbook": "ALLOW",
-            "is_fp": true,
-            "rationale": "To prevent false isolation of UDP traffic with state INT.",
-            "created_at": "2026-04-30T19:35:24.931369",
-            "source": "PlaybookEditorAgent"
-        },
-        "analysis": "The fused_risk signal was artificially elevated due to the fusion algorithm combining low individual risks into a high score, misleading the SOAR engine.\n\nThe threat classification model hallucinated, misclassifying benign UDP traffic with state \"INT\" as Shellcode, likely due to over-sensitivity to the \"INT\" feature.\n\nTrust factors were penalized by the threat classification delta and quarantine history, reducing the overall trust score below the threshold for isolation.",
-        "corrected_at": "2026-04-30T19:35:24.934033"
-    },
-    {
-        "event_id": 107004,
-        "context": {
-            "event_id": 107004,
-            "timestamp": "2026-04-30T19:37:52.870857",
-            "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.015,
-                "fused_risk": 0.814
-            },
-            "predicted_threat_classification": "Fuzzers",
-            "network_telemetry": {
-                "ct_state_ttl": "1",
-                "is_ftp_login": "0",
-                "is_sm_ips_ports": "0",
-                "proto": "tcp",
-                "service": "-",
-                "state": "FIN",
-                "dur": 0.642795,
-                "spkts": 10.0,
-                "dpkts": 6.0,
-                "sbytes": 534.0,
-                "dbytes": 268.0,
-                "rate": 23.335588,
-                "sttl": 254.0,
-                "dttl": 252.0,
-                "sload": 5986.356445,
-                "dload": 2787.824951,
-                "sloss": 2.0,
-                "dloss": 1.0,
-                "sinpkt": 71.421667,
-                "dinpkt": 101.990797,
-                "sjit": 3711.269505,
-                "djit": 177.288,
-                "swin": 255.0,
-                "stcpb": 3002194200.0,
-                "dtcpb": 3038802795.0,
-                "dwin": 255.0,
-                "tcprtt": 0.162378,
-                "synack": 0.093962,
-                "ackdat": 0.068416,
-                "smean": 53.0,
-                "dmean": 45.0,
-                "trans_depth": 0.0,
-                "response_body_len": 0.0,
-                "ct_srv_src": 4.0,
+                "ct_srv_src": 6.0,
                 "ct_dst_ltm": 1.0,
                 "ct_src_dport_ltm": 1.0,
                 "ct_dst_sport_ltm": 1.0,
@@ -538,59 +227,54 @@
             }
         },
         "ai_decision": {
-            "reasoning": "Signature 'tcp_-_FIN' is in active quarantine. Immediate isolation without LLM re-evaluation.",
-            "playbook": "NETWORK_ISOLATION",
+            "reasoning": "Trust score 0.7061 meets threshold 0.4. No escalation required.",
+            "playbook": "ALLOW",
             "is_false_positive": false,
-            "is_llm_failsafe": false,
             "trust_eval": {
-                "trust_score": 0.1558,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
+                "trust_score": 0.7061,
+                "behavior_signature": "udp_-_INT_Normal_R3_A3_V1_E2",
+                "threat_type": "Normal",
                 "factors": [
                     {
                         "name": "ml_fused_risk",
-                        "delta": -0.24419999999999997,
-                        "reason": "fused_risk=0.8140 \u00d7 weight=0.30"
+                        "delta": -0.24389999999999998,
+                        "reason": "fused_risk=0.8130 \u00d7 weight=0.30"
                     },
                     {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "quarantine_history",
-                        "delta": -0.4,
-                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                        "name": "evidence_bias",
+                        "delta": -0.05,
+                        "reason": "signature 'udp_-_INT_Normal_R3_A3_V1_E2' monitoring: bias=-0.050 (normal=0.0, attack=1.0)"
                     }
                 ],
                 "policy_violations": [],
-                "is_acceptable": false,
-                "evaluated_at": "2026-04-30T19:37:52.870857"
+                "is_acceptable": true,
+                "evaluated_at": "2026-05-10T17:17:56.656525"
             }
         },
         "new_rule": {
-            "id": "LEARNED_004",
-            "condition": "proto=tcp AND state=FIN AND spkts=10.0 AND dpkts=6.0",
-            "playbook": "ALLOW",
-            "is_fp": true,
-            "rationale": "Event had low anomaly and",
-            "created_at": "2026-04-30T19:39:36.367404",
+            "id": "FN_PATCH_002",
+            "condition": "proto=udp AND state=INT AND service=- AND dpkts=0",
+            "playbook": "NETWORK_ISOLATION",
+            "is_fn": true,
+            "rationale": "Catches UDP traffic with no destination packets and specific state, similar to the false negative attack.",
+            "created_at": "2026-05-10T17:19:44.740142",
             "source": "PlaybookEditorAgent"
         },
-        "analysis": "The fused_risk was artificially high due to the system's over-reliance on the 'tcp_-_FIN' signature, which incorrectly elevated the risk score despite low anomaly and categorical risks. Trust factors were penalized by negative deltas from fused_risk, threat classification (mislabeling as Fuzzers), and quarantine history, collectively reducing the trust score below the isolation threshold. The specific feature 'tcp with state FIN' confused the models, mistaking normal connection termination for malicious activity, likely due to a model hallucination bias.",
-        "corrected_at": "2026-04-30T19:39:36.371330"
+        "analysis": "The high trust score (0.7061) exceeded the threshold (0.4), allowing the traffic despite high anomaly_risk (0.984) and fused_risk (0.813).  \nTrust adjustments, including a negative evidence_bias (-0.05), downplayed the risk signals.  \nMisclassification as \"Normal\" and telemetry features (UDP, low packet counts) disguised the attack.  \nThe threat classification failed to align with the high ML risks, indicating a detection error.",
+        "corrected_at": "2026-05-10T17:19:44.741660"
     },
     {
-        "event_id": 61394,
+        "event_id": 82140,
         "context": {
-            "event_id": 61394,
-            "timestamp": "2026-04-30T19:40:46.192665",
+            "event_id": 82140,
+            "timestamp": "2026-05-10T17:23:04.692446",
             "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.055,
-                "fused_risk": 0.818
+                "categorical_risk": 0.462,
+                "anomaly_risk": 0.962,
+                "fused_risk": 0.851,
+                "incident_entropy": 1.3663
             },
-            "predicted_threat_classification": "Fuzzers",
+            "predicted_threat_classification": "Normal",
             "network_telemetry": {
                 "ct_state_ttl": "1",
                 "is_ftp_login": "0",
@@ -598,535 +282,500 @@
                 "proto": "tcp",
                 "service": "-",
                 "state": "FIN",
-                "dur": 0.613861,
-                "spkts": 12.0,
-                "dpkts": 8.0,
-                "sbytes": 1036.0,
-                "dbytes": 766.0,
-                "rate": 30.951631,
+                "dur": 0.30864,
+                "spkts": 10.0,
+                "dpkts": 6.0,
+                "sbytes": 610.0,
+                "dbytes": 268.0,
+                "rate": 48.600311,
                 "sttl": 254.0,
                 "dttl": 252.0,
-                "sload": 12380.65234,
-                "dload": 8744.650391,
+                "sload": 14230.1709,
+                "dload": 5806.117188,
+                "sloss": 2.0,
+                "dloss": 1.0,
+                "sinpkt": 34.189667,
+                "dinpkt": 44.203801,
+                "sjit": 1795.356649,
+                "djit": 64.264441,
+                "swin": 255.0,
+                "stcpb": 3030745850.0,
+                "dtcpb": 3833938208.0,
+                "dwin": 255.0,
+                "tcprtt": 0.127448,
+                "synack": 0.087611,
+                "ackdat": 0.039837,
+                "smean": 61.0,
+                "dmean": 45.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 8.0,
+                "ct_dst_ltm": 2.0,
+                "ct_src_dport_ltm": 2.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 8.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 2.0,
+                "ct_srv_dst": 8.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Normal threat class with moderate packet counts, likely benign traffic.",
+            "playbook": "ALLOW",
+            "is_false_positive": true,
+            "trust_eval": {
+                "trust_score": 0.7447,
+                "behavior_signature": "tcp_-_FIN_Normal_R4_A3_V1_E2",
+                "threat_type": "Normal",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.25529999999999997,
+                        "reason": "fused_risk=0.8510 \u00d7 weight=0.30"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": true,
+                "evaluated_at": "2026-05-10T17:23:04.692446"
+            }
+        },
+        "new_rule": null,
+        "analysis": "Unable to generate FN analysis: LLM unavailable. Autonomous fallback triggered.",
+        "corrected_at": "2026-05-10T17:25:16.138108"
+    },
+    {
+        "event_id": 71579,
+        "context": {
+            "event_id": 71579,
+            "timestamp": "2026-05-10T17:25:16.139825",
+            "ml_risk_profile": {
+                "categorical_risk": 0.462,
+                "anomaly_risk": 0.903,
+                "fused_risk": 0.844,
+                "incident_entropy": 1.3663
+            },
+            "predicted_threat_classification": "Normal",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.185263,
+                "spkts": 10.0,
+                "dpkts": 6.0,
+                "sbytes": 2284.0,
+                "dbytes": 268.0,
+                "rate": 80.965981,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 88781.89844,
+                "dload": 9672.736328,
+                "sloss": 2.0,
+                "dloss": 1.0,
+                "sinpkt": 19.227444,
+                "dinpkt": 35.795398,
+                "sjit": 1030.271481,
+                "djit": 62.470602,
+                "swin": 255.0,
+                "stcpb": 1834440739.0,
+                "dtcpb": 2313006358.0,
+                "dwin": 255.0,
+                "tcprtt": 0.05553,
+                "synack": 0.006271,
+                "ackdat": 0.049259,
+                "smean": 228.0,
+                "dmean": 45.0,
+                "trans_depth": 1.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 2.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 1.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 1.0,
+                "ct_src_ltm": 1.0,
+                "ct_srv_dst": 1.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Trust score 0.6968 meets threshold 0.4. No escalation required.",
+            "playbook": "ALLOW",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.6968,
+                "behavior_signature": "tcp_-_FIN_Normal_R3_A3_V1_E2",
+                "threat_type": "Normal",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.2532,
+                        "reason": "fused_risk=0.8440 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "evidence_bias",
+                        "delta": -0.05,
+                        "reason": "signature 'tcp_-_FIN_Normal_R3_A3_V1_E2' monitoring: bias=-0.050 (normal=0.0, attack=1.0)"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": true,
+                "evaluated_at": "2026-05-10T17:25:16.139825"
+            }
+        },
+        "new_rule": {
+            "id": "FN_PATCH_003",
+            "condition": "proto=tcp AND state=FIN AND spkts=10.0",
+            "playbook": "NETWORK_ISOLATION",
+            "is_fn": true,
+            "rationale": "Detects TCP FIN packets with 10 source packets to prevent false negatives in network isolation.",
+            "created_at": "2026-05-10T17:27:10.369207",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "The high trust score of 0.6968, influenced by a negative evidence bias from the 'tcp_-_FIN_Normal_R3_A3_V1_E2' signature, met the threshold of 0.4, overriding the high anomaly_risk (0.903) and fused_risk (0.844). The evidence bias (-0.05) skewed the classification towards normal, despite the ML risks indicating high severity. Traffic",
+        "corrected_at": "2026-05-10T17:27:10.371287"
+    },
+    {
+        "event_id": 73498,
+        "context": {
+            "event_id": 73498,
+            "timestamp": "2026-05-10T17:27:10.404277",
+            "ml_risk_profile": {
+                "categorical_risk": 0.462,
+                "anomaly_risk": 0.962,
+                "fused_risk": 0.851,
+                "incident_entropy": 1.3663
+            },
+            "predicted_threat_classification": "Normal",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.547129,
+                "spkts": 14.0,
+                "dpkts": 12.0,
+                "sbytes": 952.0,
+                "dbytes": 622.0,
+                "rate": 45.693065,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 12925.6543,
+                "dload": 8349.037109,
+                "sloss": 4.0,
+                "dloss": 4.0,
+                "sinpkt": 40.767076,
+                "dinpkt": 47.79309,
+                "sjit": 2273.714504,
+                "djit": 57.601016,
+                "swin": 255.0,
+                "stcpb": 3063852274.0,
+                "dtcpb": 3138914116.0,
+                "dwin": 255.0,
+                "tcprtt": 0.039078,
+                "synack": 0.021396,
+                "ackdat": 0.017682,
+                "smean": 68.0,
+                "dmean": 52.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 1.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 1.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 1.0,
+                "ct_srv_dst": 1.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Normal threat class with FIN state, likely standard TCP teardown despite moderate packet counts.",
+            "playbook": "ALLOW",
+            "is_false_positive": true,
+            "trust_eval": {
+                "trust_score": 0.73849,
+                "behavior_signature": "tcp_-_FIN_Normal_R4_A3_V1_E2",
+                "threat_type": "Normal",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.25529999999999997,
+                        "reason": "fused_risk=0.8510 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "evidence_bias",
+                        "delta": -0.006210110110110113,
+                        "reason": "signature 'tcp_-_FIN_Normal_R4_A3_V1_E2' monitoring: bias=-0.006 (normal=0.8757977977977978, attack=1.0)"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": true,
+                "evaluated_at": "2026-05-10T17:27:10.404277"
+            }
+        },
+        "new_rule": {
+            "id": "FN_PATCH_004",
+            "condition": "proto=tcp AND state=FIN AND threat_class=Normal",
+            "playbook": "NETWORK_ISOLATION",
+            "is_fn": true,
+            "rationale": "Catches TCP traffic with FIN state and Normal threat class to prevent false negatives.",
+            "created_at": "2026-05-10T17:30:12.320929",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "The high trust score of 0.6968, which surpassed the decision threshold, prioritized the traffic despite elevated anomaly_risk (0.962) and fused_risk (0.851). This override was exacerbated by a negative evidence bias from the 'tcp_-_FIN_Normal_R3_A3_V1_E2' signature, which has mixed historical evidence (1 benign, 1 malicious), reducing the risk assessment. The threat classification as \"Normal\" with a FIN state obscured malicious activity, allowing the traffic due to the system's trust-based fast-path.",
+        "corrected_at": "2026-05-10T17:30:12.323397"
+    },
+    {
+        "event_id": 87477,
+        "context": {
+            "event_id": 87477,
+            "timestamp": "2026-05-10T17:31:59.676275",
+            "ml_risk_profile": {
+                "categorical_risk": 0.642,
+                "anomaly_risk": 0.185,
+                "fused_risk": 0.918,
+                "incident_entropy": 1.3739
+            },
+            "predicted_threat_classification": "Exploits",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "http",
+                "state": "FIN",
+                "dur": 0.674028,
+                "spkts": 10.0,
+                "dpkts": 10.0,
+                "sbytes": 808.0,
+                "dbytes": 1164.0,
+                "rate": 28.188741,
+                "sttl": 62.0,
+                "dttl": 252.0,
+                "sload": 8640.59082,
+                "dload": 12438.65234,
+                "sloss": 2.0,
+                "dloss": 2.0,
+                "sinpkt": 74.892,
+                "dinpkt": 67.034664,
+                "sjit": 4712.28962,
+                "djit": 115.118594,
+                "swin": 255.0,
+                "stcpb": 569051990.0,
+                "dtcpb": 4188378502.0,
+                "dwin": 255.0,
+                "tcprtt": 0.134872,
+                "synack": 0.069921,
+                "ackdat": 0.064951,
+                "smean": 81.0,
+                "dmean": 116.0,
+                "trans_depth": 1.0,
+                "response_body_len": 202.0,
+                "ct_srv_src": 6.0,
+                "ct_dst_ltm": 2.0,
+                "ct_src_dport_ltm": 2.0,
+                "ct_dst_sport_ltm": 2.0,
+                "ct_dst_src_ltm": 6.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 4.0,
+                "ct_src_ltm": 2.0,
+                "ct_srv_dst": 6.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "High fused risk score of 0.918 exceeds the threshold, indicating a critical threat requiring network isolation.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.3325,
+                "behavior_signature": "tcp_http_FIN_Exploits_R4_A1_V1_E2",
+                "threat_type": "Exploits",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.2754,
+                        "reason": "fused_risk=0.9180 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "threat_classification",
+                        "delta": -0.3,
+                        "reason": "predicted_threat='Exploits' \u2192 penalty=0.30"
+                    },
+                    {
+                        "name": "evidence_bias",
+                        "delta": -0.09210000000000002,
+                        "reason": "signature 'tcp_http_FIN_Exploits_R4_A1_V1_E2' monitoring: bias=-0.092 (normal=0.0, attack=1.842)"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-05-10T17:31:59.676275"
+            }
+        },
+        "new_rule": {
+            "id": "LEARNED_005",
+            "condition": "proto=tcp AND service=http AND state=FIN AND spkts=10.0 AND dpkts=10.0",
+            "playbook": "ALLOW",
+            "is_fp": true,
+            "rationale": "Allows benign HTTP traffic with FIN state and low packet counts to prevent false positives.",
+            "created_at": "2026-05-10T17:34:03.603429",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "The fused_risk score was artificially high due to the high penalty from threat classification delta (-0.3) for predicted 'Exploits', despite low anomaly_risk. The evidence_bias delta (-0.0921) for the 'tcp_http_FIN_Exploits' signature amplified the risk, lowering the trust score below threshold. The FIN state in HTTP traffic, a normal connection termination, was misclassified by the model due to overfitting on exploit signatures.",
+        "corrected_at": "2026-05-10T17:34:03.605546"
+    },
+    {
+        "event_id": 41986,
+        "context": {
+            "event_id": 41986,
+            "timestamp": "2026-05-10T17:39:36.901252",
+            "ml_risk_profile": {
+                "categorical_risk": 0.462,
+                "anomaly_risk": 0.957,
+                "fused_risk": 0.85,
+                "incident_entropy": 1.3663
+            },
+            "predicted_threat_classification": "Normal",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.659389,
+                "spkts": 14.0,
+                "dpkts": 12.0,
+                "sbytes": 816.0,
+                "dbytes": 678.0,
+                "rate": 37.913886,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 9196.392578,
+                "dload": 7546.379883,
+                "sloss": 4.0,
+                "dloss": 4.0,
+                "sinpkt": 50.712537,
+                "dinpkt": 55.215184,
+                "sjit": 2454.855165,
+                "djit": 66.953898,
+                "swin": 255.0,
+                "stcpb": 1924661908.0,
+                "dtcpb": 523557164.0,
+                "dwin": 255.0,
+                "tcprtt": 0.096402,
+                "synack": 0.052013,
+                "ackdat": 0.044389,
+                "smean": 58.0,
+                "dmean": 57.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 6.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 5.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 1.0,
+                "ct_srv_dst": 5.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "TCP traffic with FIN state and Normal threat class detected by learned rule to prevent false positives.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "trust_eval": {
+                "trust_score": 0.68988,
+                "behavior_signature": "tcp_-_FIN_Normal_R4_A3_V1_E2",
+                "threat_type": "Normal",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.255,
+                        "reason": "fused_risk=0.8500 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "evidence_bias",
+                        "delta": -0.05512022022022023,
+                        "reason": "signature 'tcp_-_FIN_Normal_R4_A3_V1_E2' monitoring: bias=-0.055 (normal=1.7515955955955955, attack=2.854)"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": true,
+                "evaluated_at": "2026-05-10T17:39:36.901252"
+            }
+        },
+        "new_rule": {
+            "id": "LEARNED_006",
+            "condition": "proto=tcp AND state=FIN AND threat_class=Normal",
+            "playbook": "ALLOW",
+            "is_fp": true,
+            "rationale": "Allows tcp traffic in FIN state with normal threat class to avoid false positives.",
+            "created_at": "2026-05-10T17:41:21.942056",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "The anomaly_risk was artificially high due to the TCP traffic in FIN state, which is unusual and mimics attack patterns, despite the threat class being Normal.  \nThe fused_risk was elevated because anomaly_risk dominates the fusion, and the trust factors penalized fused_risk with a delta of -0.255, but the evidence_bias penalty was minimal, allowing the trust score to fall below threshold.  \nThe traffic feature (proto=tcp, state=FIN) confused the models by triggering anomaly detection without context, potentially indicating a known model hallucination where state-based features override categorical threat classes.",
+        "corrected_at": "2026-05-10T17:41:21.943212"
+    },
+    {
+        "event_id": 98185,
+        "context": {
+            "event_id": 98185,
+            "timestamp": "2026-05-10T17:45:36.748279",
+            "ml_risk_profile": {
+                "categorical_risk": 0.462,
+                "anomaly_risk": 0.97,
+                "fused_risk": 0.852,
+                "incident_entropy": 1.3663
+            },
+            "predicted_threat_classification": "Normal",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.883516,
+                "spkts": 12.0,
+                "dpkts": 8.0,
+                "sbytes": 1162.0,
+                "dbytes": 702.0,
+                "rate": 21.504987,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 9652.34375,
+                "dload": 5568.659668,
                 "sloss": 3.0,
                 "dloss": 2.0,
-                "sinpkt": 54.188364,
-                "dinpkt": 79.217141,
-                "sjit": 2966.563337,
-                "djit": 129.913367,
+                "sinpkt": 80.231003,
+                "dinpkt": 113.835711,
+                "sjit": 4091.469617,
+                "djit": 156.216078,
                 "swin": 255.0,
-                "stcpb": 1172850344.0,
-                "dtcpb": 2223748938.0,
+                "stcpb": 2730430484.0,
+                "dtcpb": 3814516618.0,
                 "dwin": 255.0,
-                "tcprtt": 0.076925,
-                "synack": 0.059332,
-                "ackdat": 0.017593,
-                "smean": 86.0,
-                "dmean": 96.0,
+                "tcprtt": 0.152727,
+                "synack": 0.086657,
+                "ackdat": 0.06607,
+                "smean": 97.0,
+                "dmean": 88.0,
                 "trans_depth": 0.0,
                 "response_body_len": 0.0,
                 "ct_srv_src": 3.0,
                 "ct_dst_ltm": 1.0,
                 "ct_src_dport_ltm": 1.0,
                 "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 2.0,
-                "ct_ftp_cmd": 0.0,
-                "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 2.0,
-                "ct_srv_dst": 2.0
-            }
-        },
-        "ai_decision": {
-            "reasoning": "Trust score 0.7046 meets threshold 0.4. No escalation required.",
-            "playbook": "ALLOW",
-            "is_false_positive": false,
-            "trust_eval": {
-                "trust_score": 0.7046,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
-                "factors": [
-                    {
-                        "name": "ml_fused_risk",
-                        "delta": -0.24539999999999998,
-                        "reason": "fused_risk=0.8180 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "allowlist_bonus",
-                        "delta": 0.15,
-                        "reason": "signature 'tcp_-_FIN' was previously verified as benign (FP)"
-                    }
-                ],
-                "policy_violations": [],
-                "is_acceptable": true,
-                "evaluated_at": "2026-04-30T19:40:46.192665"
-            }
-        },
-        "new_rule": {
-            "id": "FN_PATCH_004",
-            "condition": "proto=tcp AND state=FIN AND threat_class=Fuzzers",
-            "playbook": "NETWORK_ISOLATION",
-            "is_fn": true,
-            "rationale": "Catches Fuzzers attacks with TCP FIN state to prevent disguised traffic.",
-            "created_at": "2026-04-30T19:41:44.778192",
-            "source": "PlaybookEditorAgent"
-        },
-        "analysis": "The allowlist bonus incorrectly elevated trust for the 'tcp_-_FIN' signature, which was previously mislabeled as benign, despite evidence of a fuzzing attack.  \nThe low anomaly_risk and adjusted fused_risk (due to weighting) failed to adequately counterbalance this bonus, resulting in a high trust score.  \nThe threat classification penalty for 'Fuzzers' was insufficient to offset the positive delta, allowing the system to permit the disguised attack traffic.",
-        "corrected_at": "2026-04-30T19:41:44.779449"
-    },
-    {
-        "event_id": 47657,
-        "context": {
-            "event_id": 47657,
-            "timestamp": "2026-04-30T19:44:01.377358",
-            "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.087,
-                "fused_risk": 0.822
-            },
-            "predicted_threat_classification": "Fuzzers",
-            "network_telemetry": {
-                "ct_state_ttl": "1",
-                "is_ftp_login": "0",
-                "is_sm_ips_ports": "0",
-                "proto": "tcp",
-                "service": "-",
-                "state": "FIN",
-                "dur": 0.578908,
-                "spkts": 20.0,
-                "dpkts": 8.0,
-                "sbytes": 17802.0,
-                "dbytes": 354.0,
-                "rate": 46.639533,
-                "sttl": 254.0,
-                "dttl": 252.0,
-                "sload": 233708.9688,
-                "dload": 4283.927246,
-                "sloss": 7.0,
-                "dloss": 1.0,
-                "sinpkt": 26.085633,
-                "dinpkt": 75.085289,
-                "sjit": 1926.375422,
-                "djit": 106.067758,
-                "swin": 255.0,
-                "stcpb": 4157969508.0,
-                "dtcpb": 1804781536.0,
-                "dwin": 255.0,
-                "tcprtt": 0.140885,
-                "synack": 0.053302,
-                "ackdat": 0.087583,
-                "smean": 890.0,
-                "dmean": 44.0,
-                "trans_depth": 0.0,
-                "response_body_len": 0.0,
-                "ct_srv_src": 2.0,
-                "ct_dst_ltm": 1.0,
-                "ct_src_dport_ltm": 1.0,
-                "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 2.0,
-                "ct_ftp_cmd": 0.0,
-                "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 1.0,
-                "ct_srv_dst": 2.0
-            }
-        },
-        "ai_decision": {
-            "reasoning": "Signature 'tcp_-_FIN' is in active quarantine. Immediate isolation without LLM re-evaluation.",
-            "playbook": "NETWORK_ISOLATION",
-            "is_false_positive": false,
-            "is_llm_failsafe": false,
-            "trust_eval": {
-                "trust_score": 0.1534,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
-                "factors": [
-                    {
-                        "name": "ml_fused_risk",
-                        "delta": -0.24659999999999999,
-                        "reason": "fused_risk=0.8220 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "quarantine_history",
-                        "delta": -0.4,
-                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
-                    }
-                ],
-                "policy_violations": [],
-                "is_acceptable": false,
-                "evaluated_at": "2026-04-30T19:44:01.377358"
-            }
-        },
-        "new_rule": {
-            "id": "LEARNED_004",
-            "condition": "proto=tcp AND state=FIN",
-            "playbook": "ALLOW",
-            "is_fp": true,
-            "rationale": "This rule allows TCP traffic with FIN state that was benign, preventing future false positives.",
-            "created_at": "2026-04-30T19:45:24.556535",
-            "source": "PlaybookEditorAgent"
-        },
-        "analysis": "The fused_risk signal was artificially high due to the system's weighting, which amplified the categorical_risk from the quarantined 'tcp_-_FIN' signature.  \nThe threat classification penalty for 'Fuzzers' and the quarantine history delta artificially lowered the trust score below the threshold.  \nThe 'FIN' state in normal TCP traffic was misclassified by the model, likely due to over-sensitivity from historical quarantine data, causing a false positive.",
-        "corrected_at": "2026-04-30T19:45:24.557660"
-    },
-    {
-        "event_id": 82792,
-        "context": {
-            "event_id": 82792,
-            "timestamp": "2026-04-30T19:45:58.277670",
-            "ml_risk_profile": {
-                "categorical_risk": 0.456,
-                "anomaly_risk": 0.312,
-                "fused_risk": 0.81
-            },
-            "predicted_threat_classification": "Shellcode",
-            "network_telemetry": {
-                "ct_state_ttl": "2",
-                "is_ftp_login": "0",
-                "is_sm_ips_ports": "0",
-                "proto": "udp",
-                "service": "-",
-                "state": "INT",
-                "dur": 4e-06,
-                "spkts": 2.0,
-                "dpkts": 0.0,
-                "sbytes": 1064.0,
-                "dbytes": 0.0,
-                "rate": 250000.0006,
-                "sttl": 254.0,
-                "dttl": 0.0,
-                "sload": 1064000000.0,
-                "dload": 0.0,
-                "sloss": 0.0,
-                "dloss": 0.0,
-                "sinpkt": 0.004,
-                "dinpkt": 0.0,
-                "sjit": 0.0,
-                "djit": 0.0,
-                "swin": 0.0,
-                "stcpb": 0.0,
-                "dtcpb": 0.0,
-                "dwin": 0.0,
-                "tcprtt": 0.0,
-                "synack": 0.0,
-                "ackdat": 0.0,
-                "smean": 532.0,
-                "dmean": 0.0,
-                "trans_depth": 0.0,
-                "response_body_len": 0.0,
-                "ct_srv_src": 2.0,
-                "ct_dst_ltm": 1.0,
-                "ct_src_dport_ltm": 1.0,
-                "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 2.0,
-                "ct_ftp_cmd": 0.0,
-                "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 1.0,
-                "ct_srv_dst": 2.0
-            }
-        },
-        "ai_decision": {
-            "reasoning": "Trust score 0.4570 meets threshold 0.4. No escalation required.",
-            "playbook": "ALLOW",
-            "is_false_positive": false,
-            "trust_eval": {
-                "trust_score": 0.457,
-                "behavior_signature": "udp_-_INT",
-                "threat_type": "Shellcode",
-                "factors": [
-                    {
-                        "name": "ml_fused_risk",
-                        "delta": -0.243,
-                        "reason": "fused_risk=0.8100 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.45,
-                        "reason": "predicted_threat='Shellcode' \u2192 penalty=0.45"
-                    },
-                    {
-                        "name": "allowlist_bonus",
-                        "delta": 0.15,
-                        "reason": "signature 'udp_-_INT' was previously verified as benign (FP)"
-                    }
-                ],
-                "policy_violations": [
-                    "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold"
-                ],
-                "is_acceptable": true,
-                "evaluated_at": "2026-04-30T19:45:58.277670"
-            }
-        },
-        "new_rule": {
-            "id": "FN_PATCH_004",
-            "condition": "proto=udp AND state=INT AND threat_class=Shellcode",
-            "playbook": "NETWORK_ISOLATION",
-            "is_fn": true,
-            "rationale": "Catches UDP Shellcode attacks with INT state to prevent allowlist bypass.",
-            "created_at": "2026-04-30T19:46:59.967284",
-            "source": "PlaybookEditorAgent"
-        },
-        "analysis": "The allowlist bonus incorrectly boosted the trust score by marking a previously benign signature ('udp_-_INT') as trusted, overriding the threat classification penalty and low anomaly_risk signals.  \nThe threat classification penalty (-0.45 delta) and low anomaly_risk (0.312) failed to sufficiently elevate the risk, allowing the allowlist to dominate the decision despite the fused_risk being adjusted down.  \nUDP protocol and low packet activity (spkts=2.0, dpkts=0.0) disguised the shellcode attack by mimicking benign traffic patterns, reducing detection sensitivity.",
-        "corrected_at": "2026-04-30T19:46:59.969100"
-    },
-    {
-        "event_id": 84149,
-        "context": {
-            "event_id": 84149,
-            "timestamp": "2026-04-30T19:48:20.161256",
-            "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.095,
-                "fused_risk": 0.823
-            },
-            "predicted_threat_classification": "Fuzzers",
-            "network_telemetry": {
-                "ct_state_ttl": "1",
-                "is_ftp_login": "0",
-                "is_sm_ips_ports": "0",
-                "proto": "tcp",
-                "service": "-",
-                "state": "FIN",
-                "dur": 0.990069,
-                "spkts": 10.0,
-                "dpkts": 6.0,
-                "sbytes": 994.0,
-                "dbytes": 268.0,
-                "rate": 15.15046,
-                "sttl": 254.0,
-                "dttl": 252.0,
-                "sload": 7231.819336,
-                "dload": 1809.974854,
-                "sloss": 2.0,
-                "dloss": 1.0,
-                "sinpkt": 103.267333,
-                "dinpkt": 169.269797,
-                "sjit": 5693.396528,
-                "djit": 279.731969,
-                "swin": 255.0,
-                "stcpb": 4051459646.0,
-                "dtcpb": 1166852715.0,
-                "dwin": 255.0,
-                "tcprtt": 0.24883,
-                "synack": 0.143712,
-                "ackdat": 0.105118,
-                "smean": 99.0,
-                "dmean": 45.0,
-                "trans_depth": 0.0,
-                "response_body_len": 0.0,
-                "ct_srv_src": 5.0,
-                "ct_dst_ltm": 2.0,
-                "ct_src_dport_ltm": 1.0,
-                "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 6.0,
-                "ct_ftp_cmd": 0.0,
-                "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 1.0,
-                "ct_srv_dst": 8.0
-            }
-        },
-        "ai_decision": {
-            "reasoning": "Signature 'tcp_-_FIN' is in active quarantine. Immediate isolation without LLM re-evaluation.",
-            "playbook": "NETWORK_ISOLATION",
-            "is_false_positive": false,
-            "is_llm_failsafe": false,
-            "trust_eval": {
-                "trust_score": 0.1531,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
-                "factors": [
-                    {
-                        "name": "ml_fused_risk",
-                        "delta": -0.24689999999999998,
-                        "reason": "fused_risk=0.8230 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "quarantine_history",
-                        "delta": -0.4,
-                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
-                    }
-                ],
-                "policy_violations": [],
-                "is_acceptable": false,
-                "evaluated_at": "2026-04-30T19:48:20.161256"
-            }
-        },
-        "new_rule": {
-            "id": "LEARNED_005",
-            "condition": "proto=tcp AND state=FIN",
-            "playbook": "ALLOW",
-            "is_fp": true,
-            "rationale": "Allows benign tcp traffic with FIN state to prevent false isolation.",
-            "created_at": "2026-04-30T19:49:53.101399",
-            "source": "PlaybookEditorAgent"
-        },
-        "analysis": "The fused_risk score was artificially elevated due to the high threat classification penalty for 'Fuzzers' and the quarantine history of the 'tcp_-_FIN' signature, despite low anomaly_risk indicating benign traffic. Policy trust factors, including ml_fused_risk and threat classification deltas, were penalized, reducing the trust score below the threshold for isolation. The specific feature, the TCP FIN state, likely confused the model into misclassifying normal traffic as malicious fuzzing activity.",
-        "corrected_at": "2026-04-30T19:49:53.102605"
-    },
-    {
-        "event_id": 75280,
-        "context": {
-            "event_id": 75280,
-            "timestamp": "2026-04-30T19:50:26.822111",
-            "ml_risk_profile": {
-                "categorical_risk": 0.456,
-                "anomaly_risk": 0.149,
-                "fused_risk": 0.79
-            },
-            "predicted_threat_classification": "Shellcode",
-            "network_telemetry": {
-                "ct_state_ttl": "2",
-                "is_ftp_login": "0",
-                "is_sm_ips_ports": "0",
-                "proto": "udp",
-                "service": "-",
-                "state": "INT",
-                "dur": 2.9e-05,
-                "spkts": 2.0,
-                "dpkts": 0.0,
-                "sbytes": 104.0,
-                "dbytes": 0.0,
-                "rate": 34482.75776,
-                "sttl": 254.0,
-                "dttl": 0.0,
-                "sload": 14344827.0,
-                "dload": 0.0,
-                "sloss": 0.0,
-                "dloss": 0.0,
-                "sinpkt": 0.029,
-                "dinpkt": 0.0,
-                "sjit": 0.0,
-                "djit": 0.0,
-                "swin": 0.0,
-                "stcpb": 0.0,
-                "dtcpb": 0.0,
-                "dwin": 0.0,
-                "tcprtt": 0.0,
-                "synack": 0.0,
-                "ackdat": 0.0,
-                "smean": 52.0,
-                "dmean": 0.0,
-                "trans_depth": 0.0,
-                "response_body_len": 0.0,
-                "ct_srv_src": 8.0,
-                "ct_dst_ltm": 3.0,
-                "ct_src_dport_ltm": 3.0,
-                "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 8.0,
-                "ct_ftp_cmd": 0.0,
-                "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 3.0,
-                "ct_srv_dst": 8.0
-            }
-        },
-        "ai_decision": {
-            "reasoning": "Signature 'udp_-_INT' is in active quarantine. Immediate isolation without LLM re-evaluation.",
-            "playbook": "NETWORK_ISOLATION",
-            "is_false_positive": false,
-            "is_llm_failsafe": false,
-            "trust_eval": {
-                "trust_score": 0.0,
-                "behavior_signature": "udp_-_INT",
-                "threat_type": "Shellcode",
-                "factors": [
-                    {
-                        "name": "ml_fused_risk",
-                        "delta": -0.237,
-                        "reason": "fused_risk=0.7900 \u00d7 weight=0.30"
-                    },
-                    {
-                        "name": "threat_classification",
-                        "delta": -0.45,
-                        "reason": "predicted_threat='Shellcode' \u2192 penalty=0.45"
-                    },
-                    {
-                        "name": "quarantine_history",
-                        "delta": -0.4,
-                        "reason": "signature 'udp_-_INT' is in active_quarantines"
-                    }
-                ],
-                "policy_violations": [
-                    "HIGH_SEVERITY_THREAT: Shellcode exceeds critical threshold"
-                ],
-                "is_acceptable": false,
-                "evaluated_at": "2026-04-30T19:50:26.822111"
-            }
-        },
-        "new_rule": {
-            "id": "LEARNED_005",
-            "condition": "proto=udp AND state=INT AND spkts=2.0",
-            "playbook": "ALLOW",
-            "is_fp": true,
-            "rationale": "Allows benign UDP traffic with low packet counts to prevent false isolation.",
-            "created_at": "2026-04-30T19:51:41.880620",
-            "source": "PlaybookEditorAgent"
-        },
-        "analysis": "The threat classification model hallucinated, misclassifying benign UDP traffic with state \"INT\" as shellcode due to overfitting on similar patterns or data drift.\n\nThe fused_risk signal was artificially inflated by the erroneous threat classification penalty, and the quarantine history trust factor further reduced the overall trust score below the threshold.\n\nThis represents a known model hallucination where UDP traffic features were misinterpreted as malicious indicators, leading to false positives.",
-        "corrected_at": "2026-04-30T19:51:41.882360"
-    },
-    {
-        "event_id": 65991,
-        "context": {
-            "event_id": 65991,
-            "timestamp": "2026-04-30T19:52:34.441241",
-            "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 0.024,
-                "fused_risk": 0.815
-            },
-            "predicted_threat_classification": "Fuzzers",
-            "network_telemetry": {
-                "ct_state_ttl": "1",
-                "is_ftp_login": "0",
-                "is_sm_ips_ports": "0",
-                "proto": "tcp",
-                "service": "-",
-                "state": "FIN",
-                "dur": 1.277049,
-                "spkts": 14.0,
-                "dpkts": 12.0,
-                "sbytes": 1092.0,
-                "dbytes": 678.0,
-                "rate": 19.576384,
-                "sttl": 254.0,
-                "dttl": 252.0,
-                "sload": 6352.14502,
-                "dload": 3896.483398,
-                "sloss": 4.0,
-                "dloss": 4.0,
-                "sinpkt": 98.196156,
-                "dinpkt": 110.768727,
-                "sjit": 5127.765007,
-                "djit": 189.120156,
-                "swin": 255.0,
-                "stcpb": 2048903072.0,
-                "dtcpb": 2043522489.0,
-                "dwin": 255.0,
-                "tcprtt": 0.096972,
-                "synack": 0.058592,
-                "ackdat": 0.03838,
-                "smean": 78.0,
-                "dmean": 57.0,
-                "trans_depth": 0.0,
-                "response_body_len": 0.0,
-                "ct_srv_src": 2.0,
-                "ct_dst_ltm": 1.0,
-                "ct_src_dport_ltm": 1.0,
-                "ct_dst_sport_ltm": 1.0,
-                "ct_dst_src_ltm": 2.0,
+                "ct_dst_src_ltm": 3.0,
                 "ct_ftp_cmd": 0.0,
                 "ct_flw_http_mthd": 0.0,
                 "ct_src_ltm": 1.0,
@@ -1134,58 +783,54 @@
             }
         },
         "ai_decision": {
-            "reasoning": "Trust score 0.7055 meets threshold 0.4. No escalation required.",
+            "reasoning": "TCP traffic with FIN state and Normal threat class, likely benign false positive.",
             "playbook": "ALLOW",
-            "is_false_positive": false,
+            "is_false_positive": true,
             "trust_eval": {
-                "trust_score": 0.7055,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
+                "trust_score": 0.69678,
+                "behavior_signature": "tcp_-_FIN_Normal_R4_A3_V1_E2",
+                "threat_type": "Normal",
                 "factors": [
                     {
                         "name": "ml_fused_risk",
-                        "delta": -0.24449999999999997,
-                        "reason": "fused_risk=0.8150 \u00d7 weight=0.30"
+                        "delta": -0.2556,
+                        "reason": "fused_risk=0.8520 \u00d7 weight=0.30"
                     },
                     {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "allowlist_bonus",
-                        "delta": 0.15,
-                        "reason": "signature 'tcp_-_FIN' was previously verified as benign (FP)"
+                        "name": "evidence_bias",
+                        "delta": -0.047620220220220236,
+                        "reason": "signature 'tcp_-_FIN_Normal_R4_A3_V1_E2' monitoring: bias=-0.048 (normal=2.7515955955955955, attack=3.704)"
                     }
                 ],
                 "policy_violations": [],
                 "is_acceptable": true,
-                "evaluated_at": "2026-04-30T19:52:34.442031"
+                "evaluated_at": "2026-05-10T17:45:36.749280"
             }
         },
         "new_rule": {
             "id": "FN_PATCH_006",
-            "condition": "proto=tcp AND state=FIN AND threat_class=Fuzzers",
+            "condition": "proto=tcp AND state=FIN AND threat_class=Normal",
             "playbook": "NETWORK_ISOLATION",
             "is_fn": true,
-            "rationale": "Catches fuzzers attacks with tcp FIN state that bypassed detection due to allowlist override.",
-            "created_at": "2026-04-30T19:53:27.085581",
+            "rationale": "Catches TCP FIN packets with normal threat classification to prevent missed detections.",
+            "created_at": "2026-05-10T17:48:31.882529",
             "source": "PlaybookEditorAgent"
         },
-        "analysis": "The allowlist bonus incorrectly elevated trust for the 'tcp_FIN' signature, which was historically marked as benign, overriding the low anomaly risk despite the threat classification penalty.\n\nThe fused_risk, though high, was penalized by the ml_fused_risk delta, and the low anomaly_risk failed to compensate for the 'Fuzzers' threat, allowing passage due to the trust score threshold.\n\nThe traffic's FIN state, characteristic of fuzzing attacks, was disguised by the allowlist override, preventing detection of the malicious intent.",
-        "corrected_at": "2026-04-30T19:53:27.086902"
+        "analysis": "The threat was missed because the Normal threat classification, despite high anomaly_risk (0.97) and fused_risk (0.852), was incorrectly prioritized as benign due to the traffic's FIN state in TCP, which masked malicious intent. The evidence_bias delta of -0.0476 reinforced this misclassification by favoring normal behavior for the signature 'tcp_-_FIN_Normal_R4_A3_V1_E2'. This allowed the attack to bypass detection despite the ML models flagging high risk.",
+        "corrected_at": "2026-05-10T17:48:31.885041"
     },
     {
-        "event_id": 74562,
+        "event_id": 104694,
         "context": {
-            "event_id": 74562,
-            "timestamp": "2026-04-30T19:53:27.089702",
+            "event_id": 104694,
+            "timestamp": "2026-05-10T17:50:04.142451",
             "ml_risk_profile": {
-                "categorical_risk": 0.461,
-                "anomaly_risk": 1.0,
-                "fused_risk": 0.905
+                "categorical_risk": 0.462,
+                "anomaly_risk": 0.983,
+                "fused_risk": 0.853,
+                "incident_entropy": 1.3663
             },
-            "predicted_threat_classification": "Fuzzers",
+            "predicted_threat_classification": "Normal",
             "network_telemetry": {
                 "ct_state_ttl": "1",
                 "is_ftp_login": "0",
@@ -1193,85 +838,174 @@
                 "proto": "tcp",
                 "service": "-",
                 "state": "FIN",
-                "dur": 39.343376,
-                "spkts": 20.0,
-                "dpkts": 12.0,
-                "sbytes": 1232.0,
-                "dbytes": 536.0,
-                "rate": 0.787934,
+                "dur": 0.537509,
+                "spkts": 10.0,
+                "dpkts": 6.0,
+                "sbytes": 534.0,
+                "dbytes": 268.0,
+                "rate": 27.906508,
                 "sttl": 254.0,
                 "dttl": 252.0,
-                "sload": 238.108704,
-                "dload": 100.042252,
-                "sloss": 4.0,
+                "sload": 7158.949707,
+                "dload": 3333.897461,
+                "sloss": 2.0,
                 "dloss": 1.0,
-                "sinpkt": 2070.647474,
-                "dinpkt": 3571.9935,
-                "sjit": 279871.9593,
-                "djit": 11088.492,
+                "sinpkt": 59.723222,
+                "dinpkt": 79.864602,
+                "sjit": 3200.483267,
+                "djit": 139.089188,
                 "swin": 255.0,
-                "stcpb": 3092125290.0,
-                "dtcpb": 533304914.0,
+                "stcpb": 1379044977.0,
+                "dtcpb": 3191728506.0,
                 "dwin": 255.0,
-                "tcprtt": 0.093048,
-                "synack": 0.051426,
-                "ackdat": 0.041622,
-                "smean": 62.0,
+                "tcprtt": 0.140142,
+                "synack": 0.093205,
+                "ackdat": 0.046937,
+                "smean": 53.0,
                 "dmean": 45.0,
                 "trans_depth": 0.0,
                 "response_body_len": 0.0,
-                "ct_srv_src": 13.0,
-                "ct_dst_ltm": 4.0,
-                "ct_src_dport_ltm": 3.0,
-                "ct_dst_sport_ltm": 3.0,
-                "ct_dst_src_ltm": 13.0,
+                "ct_srv_src": 4.0,
+                "ct_dst_ltm": 1.0,
+                "ct_src_dport_ltm": 1.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 3.0,
                 "ct_ftp_cmd": 0.0,
                 "ct_flw_http_mthd": 0.0,
-                "ct_src_ltm": 4.0,
-                "ct_srv_dst": 13.0
+                "ct_src_ltm": 2.0,
+                "ct_srv_dst": 3.0
             }
         },
         "ai_decision": {
-            "reasoning": "Signature 'tcp_-_FIN' is in active quarantine. Immediate isolation without LLM re-evaluation.",
+            "reasoning": "Detected TCP FIN packet with Normal threat classification, applied learned rule for NETWORK_ISOLATION to handle potential edge cases.",
             "playbook": "NETWORK_ISOLATION",
             "is_false_positive": false,
-            "is_llm_failsafe": false,
             "trust_eval": {
-                "trust_score": 0.1285,
-                "behavior_signature": "tcp_-_FIN",
-                "threat_type": "Fuzzers",
+                "trust_score": 0.69017,
+                "behavior_signature": "tcp_-_FIN_Normal_R4_A3_V1_E2",
+                "threat_type": "Normal",
                 "factors": [
                     {
                         "name": "ml_fused_risk",
-                        "delta": -0.2715,
-                        "reason": "fused_risk=0.9050 \u00d7 weight=0.30"
+                        "delta": -0.25589999999999996,
+                        "reason": "fused_risk=0.8530 \u00d7 weight=0.30"
                     },
                     {
-                        "name": "threat_classification",
-                        "delta": -0.2,
-                        "reason": "predicted_threat='Fuzzers' \u2192 penalty=0.20"
-                    },
-                    {
-                        "name": "quarantine_history",
-                        "delta": -0.4,
-                        "reason": "signature 'tcp_-_FIN' is in active_quarantines"
+                        "name": "evidence_bias",
+                        "delta": -0.053930330330330345,
+                        "reason": "signature 'tcp_-_FIN_Normal_R4_A3_V1_E2' monitoring: bias=-0.054 (normal=3.6253933933933933, attack=4.704000000000001)"
                     }
                 ],
                 "policy_violations": [],
-                "is_acceptable": false,
-                "evaluated_at": "2026-04-30T19:53:27.089702"
+                "is_acceptable": true,
+                "evaluated_at": "2026-05-10T17:50:04.142451"
             }
         },
         "new_rule": {
             "id": "LEARNED_006",
-            "condition": "proto=tcp AND state=FIN",
+            "condition": "proto=tcp AND state=FIN AND threat_class=Normal",
             "playbook": "ALLOW",
             "is_fp": true,
-            "rationale": "This rule allows benign TCP traffic with FIN state to prevent false positives.",
-            "created_at": "2026-04-30T19:54:57.477937",
+            "rationale": "To prevent false positives by allowing benign TCP FIN packets with normal threat classification.",
+            "created_at": "2026-05-10T17:52:32.091753",
             "source": "PlaybookEditorAgent"
         },
-        "analysis": "The anomaly_risk was artificially elevated to 1.0 due to the TCP packet's FIN state, which the ML model misinterpreted as an anomaly despite being normal traffic.  \nThe fused_risk score of 0.905 was high because it aggregated the high anomaly_risk, and the threat classification penalty for \"Fuzzers\" further degraded trust.  \nTrust factors were penalized: ml_fused_risk delta negative from high fused_risk, threat classification delta negative from predicted threat, and quarantine history delta negative from the signature's active quarantine association.  \nThis combination led to the false positive isolation, potentially due to model over-sensitivity to FIN flags in benign contexts.",
-        "corrected_at": "2026-04-30T19:54:57.479058"
+        "analysis": "The anomaly_risk was artificially high due to the model misclassifying the TCP FIN packet as anomalous, despite it being part of normal traffic, likely from a feature hallucination in the anomaly detection model.\n\nThe fused_risk was elevated because of this high anomaly_risk, triggering the SOAR engine's escalation policy, even though the categorical_risk was low, indicating a false positive in the fused risk calculation.\n\nTrust factors, including a negative delta from evidence_bias, should have reduced the risk, but the system's policy prioritized ML signals over trust, leading to unnecessary containment.",
+        "corrected_at": "2026-05-10T17:52:32.095104"
+    },
+    {
+        "event_id": 74787,
+        "context": {
+            "event_id": 74787,
+            "timestamp": "2026-05-10T17:52:32.216527",
+            "ml_risk_profile": {
+                "categorical_risk": 0.462,
+                "anomaly_risk": 0.932,
+                "fused_risk": 0.848,
+                "incident_entropy": 1.3663
+            },
+            "predicted_threat_classification": "Normal",
+            "network_telemetry": {
+                "ct_state_ttl": "1",
+                "is_ftp_login": "0",
+                "is_sm_ips_ports": "0",
+                "proto": "tcp",
+                "service": "-",
+                "state": "FIN",
+                "dur": 0.225173,
+                "spkts": 10.0,
+                "dpkts": 6.0,
+                "sbytes": 626.0,
+                "dbytes": 268.0,
+                "rate": 66.615448,
+                "sttl": 254.0,
+                "dttl": 252.0,
+                "sload": 20037.92578,
+                "dload": 7958.325684,
+                "sloss": 2.0,
+                "dloss": 1.0,
+                "sinpkt": 22.247,
+                "dinpkt": 39.620398,
+                "sjit": 1230.069112,
+                "djit": 52.361715,
+                "swin": 255.0,
+                "stcpb": 476950253.0,
+                "dtcpb": 1947723095.0,
+                "dwin": 255.0,
+                "tcprtt": 0.04713,
+                "synack": 0.02707,
+                "ackdat": 0.02006,
+                "smean": 63.0,
+                "dmean": 45.0,
+                "trans_depth": 0.0,
+                "response_body_len": 0.0,
+                "ct_srv_src": 12.0,
+                "ct_dst_ltm": 3.0,
+                "ct_src_dport_ltm": 3.0,
+                "ct_dst_sport_ltm": 1.0,
+                "ct_dst_src_ltm": 12.0,
+                "ct_ftp_cmd": 0.0,
+                "ct_flw_http_mthd": 0.0,
+                "ct_src_ltm": 3.0,
+                "ct_srv_dst": 12.0
+            }
+        },
+        "ai_decision": {
+            "reasoning": "Signature 'tcp_-_FIN_Normal_R3_A3_V1_E2' is in active quarantine. Immediate isolation without LLM re-evaluation.",
+            "playbook": "NETWORK_ISOLATION",
+            "is_false_positive": false,
+            "is_llm_failsafe": false,
+            "trust_eval": {
+                "trust_score": 0.3456,
+                "behavior_signature": "tcp_-_FIN_Normal_R3_A3_V1_E2",
+                "threat_type": "Normal",
+                "factors": [
+                    {
+                        "name": "ml_fused_risk",
+                        "delta": -0.25439999999999996,
+                        "reason": "fused_risk=0.8480 \u00d7 weight=0.30"
+                    },
+                    {
+                        "name": "quarantine_history",
+                        "delta": -0.4,
+                        "reason": "signature 'tcp_-_FIN_Normal_R3_A3_V1_E2' is quarantined (n=0.0, a=4.522)"
+                    }
+                ],
+                "policy_violations": [],
+                "is_acceptable": false,
+                "evaluated_at": "2026-05-10T17:52:32.216527"
+            }
+        },
+        "new_rule": {
+            "id": "LEARNED_006",
+            "condition": "proto=tcp AND state=FIN AND threat_class=Normal",
+            "playbook": "ALLOW",
+            "is_fp": true,
+            "rationale": "Allows benign TCP FIN traffic with normal threat classification to prevent false positives.",
+            "created_at": "2026-05-10T17:53:49.151718",
+            "source": "PlaybookEditorAgent"
+        },
+        "analysis": "The anomaly_risk was artificially inflated due to the model misclassifying the TCP FIN state as an attack pattern, despite the benign traffic characteristics.  \nThe trust score was pushed below the threshold by the fused_risk penalty and the quarantine history delta, which amplified the risk signals from the quarantined signature.  \nThis represents a model hallucination where historical malicious data biased the system to escalate normal traffic, ignoring the low traffic volume and medium certainty.",
+        "corrected_at": "2026-05-10T17:53:49.154566"
     }
 ]
