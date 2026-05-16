@@ -9,18 +9,6 @@ class RCF:
     """
     Robust Random Cut Forest with Streaming Warm-up and Smoothing.
     With strict Train/Test isolation, Live Streaming, and Disk Persistence.
-
-    Changes from previous version:
-      1. _score_blind uses an incrementing counter instead of uuid4() —
-         eliminates OS entropy pool calls, significantly reduces scoring time.
-      2. effective_ceiling now uses _score_p995 (99.5th percentile) directly
-         instead of p99 * multiplier — adapts to actual tail shape, reduces
-         saturation from 12.3% to ~0.5%.
-      3. rcf_scaler stored inside the model so save/load is self-contained —
-         prevents silent mismatch when loading the model without its scaler.
-      4. Attack-trained mode: train on attack-only rows, invert output (1 - score)
-         so high score = attack-like. Required for UNSW-NB15 where attack traffic
-         is denser than normal and a normal-trained forest inverts the signal.
     """
     def __init__(self, num_trees=40, tree_size=256, seed=0, warmup=500, smoothing_window=20):
         self.num_trees        = num_trees
