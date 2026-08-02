@@ -199,31 +199,15 @@ The evaluation compares standalone models against the complete agentic pipeline 
 
 | Component | Accuracy | F1 | ROC-AUC |
 |---|---:|---:|---:|
-| Binary Classifier | -- | -- | -- |
-| Random Cut Forest | -- | -- | -- |
-| Meta-Learner | -- | -- | -- |
-| Agentic SOAR Pipeline | -- | -- | -- |
+| Binary Classifier | 93 | 0.93 | 0.9684 |
+| MultiClass Classifier | 83 | 0.83 | 0.9684 |
+| Random Cut Forest | 74 | 0.69 | 0.7471 |
+| Meta-Learner | 81 | 0.8019 | - |
+| Agentic SOAR Pipeline | 93 | 0.92 | - |
 
-Replace these values with the metrics from your experiments.
-
----
-
-## Repository Structure
-
-```text
-Agentic-SOAR/
-
-├── agents/
-├── models/
-├── evaluation/
-├── policy_engine/
-├── self_healing/
-├── data/
-├── notebooks/
-└── README.md
-```
 
 ---
+
 
 ## Future Work
 
