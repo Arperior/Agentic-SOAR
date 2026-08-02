@@ -197,15 +197,15 @@ The evaluation compares standalone models against the complete agentic pipeline 
 
 ## Results
 
-| Component | Accuracy | F1 | ROC-AUC |
-|---|---:|---:|---:|
-| Binary Classifier | 93 | 0.93 | 0.9684 |
-| MultiClass Classifier | 83 | 0.83 | 0.9684 |
-| Random Cut Forest | 74 | 0.69 | 0.7471 |
-| Meta-Learner | 81 | 0.8019 | - |
-| Agentic SOAR Pipeline | 93 | 0.92 | - |
+| Model | Acc. | Prec. | Recall | F1 | ROC-AUC | SOC Cost |
+|:---|---:|---:|---:|---:|---:|---:|
+| RCF | 74% | 0.73 | 0.97 | 0.69 | 0.7471 | 131054 |
+| CatBoost | 93% | 0.91 | **1.00** | **0.93** | 0.9684 | **26668** |
+| Incident Agent | 83% | **0.98** | 0.76 | 0.83 | — | 349222 |
+| Meta-Learner | 81% | 0.7504 | 0.9856 | 0.8019 | — | 37532 |
+| Agentic SOAR | **93%** | 0.91 | 0.98 | 0.92 | — | 47314 |
 
-
+The final Agentic SOAR pipeline preserves CatBoost-level accuracy while reducing SOC cost by 86% compared to the multi-class incident agent and improving recall over standalone anomaly detection.
 ---
 
 
