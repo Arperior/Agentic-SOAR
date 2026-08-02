@@ -15,7 +15,7 @@ Modern Security Operations Centers (SOCs) generate massive volumes of telemetry,
 - Poor adaptation to novel attacks
 - Inability to reason under uncertainty
 
-Agentic SOAR addresses these limitations by combining probabilistic anomaly detection, supervised learning, and autonomous reasoning within a Zero Trust framework. :contentReference[oaicite:1]{index=1}
+Agentic SOAR addresses these limitations by combining probabilistic anomaly detection, supervised learning, and autonomous reasoning within a Zero Trust framework. 
 
 ---
 
@@ -191,7 +191,7 @@ The framework is evaluated on the UNSW-NB15 benchmark using:
 - Rule synthesis success rate
 - Self-healing effectiveness
 
-The evaluation compares standalone models against the complete agentic pipeline under distribution shifts and class imbalance scenarios. :contentReference[oaicite:2]{index=2}
+The evaluation compares standalone models against the complete agentic pipeline under distribution shifts and class imbalance scenarios. 
 
 ---
 
